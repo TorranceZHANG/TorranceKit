@@ -12,6 +12,42 @@ force_reinstall=false
 system_install_requested=false
 current_version=""
 
+stop_running_application() {
+    local application_name="$1"
+    pgrep -x "$application_name" >/dev/null 2>&1 || return 0
+
+    osascript \
+        -e 'with timeout of 3 seconds' \
+        -e "tell application \"$application_name\" to quit" \
+        -e 'end timeout' >/dev/null 2>&1 || true
+    local attempt
+    for attempt in {1..30}; do
+        pgrep -x "$application_name" >/dev/null 2>&1 || return 0
+        sleep 0.1
+    done
+
+    echo "无法安全退出 $application_name，请手动退出后重新运行安装脚本。" >&2
+    return 1
+}
+
+launch_application_in_background() {
+    local application_path="$1"
+    open "$application_path" --args --background-launch
+
+    local attempt
+    for attempt in {1..50}; do
+        if pgrep -x TorranceKit >/dev/null 2>&1; then
+            sleep 0.8
+            pgrep -x TorranceKit >/dev/null 2>&1 \
+                || { echo "TorranceKit 启动后意外退出。" >&2; exit 1; }
+            return 0
+        fi
+        sleep 0.1
+    done
+    echo "TorranceKit 安装完成，但后台进程未能启动。" >&2
+    exit 1
+}
+
 usage() {
     cat <<'EOF'
 用法：install.sh [--version <版本>] [--system] [--source]
@@ -131,17 +167,21 @@ trap cleanup EXIT INT TERM
 download() {
     local url="$1"
     local destination="$2"
-    curl --fail --silent --show-error --location --retry 3 \
+    curl --fail --show-error --location --retry 3 \
         --connect-timeout 15 \
+        --max-time 900 \
+        --progress-bar \
         --output "$destination" \
         "$url"
 }
 
 resolve_latest_release_tag() {
     local effective_url
+    echo "正在检查 TorranceKit 正式版本…" >&2
     effective_url="$(
         curl --fail --silent --show-error --location --retry 2 \
             --connect-timeout 15 \
+            --max-time 60 \
             --output /dev/null \
             --write-out '%{url_effective}' \
             "https://github.com/$repository/releases/latest"
@@ -190,8 +230,8 @@ install_application() {
     codesign --verify --deep --strict "$source_app"
 
     mkdir -p "$trash_directory"
-    osascript -e 'tell application "TorranceKit" to quit' >/dev/null 2>&1 || true
-    osascript -e 'tell application "PasteNook" to quit' >/dev/null 2>&1 || true
+    stop_running_application TorranceKit
+    stop_running_application PasteNook
 
     if [[ "$install_root" == "/Applications" ]]; then
         sudo mkdir -p "$install_root"
@@ -211,9 +251,10 @@ install_application() {
         ditto "$source_app" "$destination_app"
     fi
 
-    open "$destination_app"
+    launch_application_in_background "$destination_app"
     local installed_version="$(plutil -extract CFBundleShortVersionString raw "$destination_app/Contents/Info.plist")"
-    echo "TorranceKit $installed_version 已安装到：$destination_app"
+    echo "TorranceKit $installed_version 已安装并在后台运行：$destination_app"
+    echo "从“应用程序”再次打开，或使用全局快捷键即可显示剪贴板。"
 }
 
 install_release() {
@@ -298,7 +339,7 @@ if [[ "$force_source" == false ]]; then
         exit 1
     fi
     if [[ "$update_only" == true ]]; then
-        echo "无法获取最新 TorranceKit Release，请稍后重试。" >&2
+        echo "无法获取最新 TorranceKit Release。请检查网络，或确认仓库已经发布正式版本。" >&2
         exit 1
     fi
 fi

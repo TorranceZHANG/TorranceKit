@@ -48,7 +48,10 @@ ClipboardMonitor ──敏感类型/应用/大小过滤──▶ ClipboardHistor
 - `AppConfiguration`：创建、校验和重新读取用户配置。
 - `GlobalHotKey`：组合快捷键通过 Carbon 注册；双击修饰键通过全局与本地 `flagsChanged` 监听，并用可测试的状态机限制时间窗口、要求中间松开且禁止其他修饰键混入。
 - `PickerPanelController`：保存唤起前的前台应用、管理浮层生命周期和快捷键。
+- `ClipboardPreviewLoader`：限制超长文本的界面预览规模，并在后台从私有 PNG 生成有界缩略图。
 - `PasteController`：把文本或 PNG/TIFF 图片写回剪贴板，恢复原应用；有权限时注入 `⌘V`。
+
+选择器使用 `moveToActiveSpace` 而非 `canJoinAllSpaces`，只进入呼出时的当前桌面；切换应用或桌面时控制器主动隐藏窗口。安装器通过 `--background-launch` 启动菜单栏进程，避免安装完成后自动弹出选择器，用户手动打开 App 时仍会进入选择器。
 
 ## 新模块接入约定
 

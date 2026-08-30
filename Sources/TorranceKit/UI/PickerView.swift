@@ -192,15 +192,7 @@ struct PickerView: View {
 
         switch selectedItem.kind {
         case .text:
-          ScrollView {
-            Text(selectedItem.text)
-              .font(.system(size: 13.5))
-              .foregroundStyle(.primary)
-              .textSelection(.enabled)
-              .multilineTextAlignment(.leading)
-              .frame(maxWidth: .infinity, alignment: .topLeading)
-              .padding(18)
-          }
+          ClipboardTextPreview(item: selectedItem)
         case .image:
           ClipboardImagePreview(item: selectedItem, history: history)
         }
@@ -352,19 +344,119 @@ private struct ClipboardRow: View {
   }
 }
 
+private struct ClipboardTextPreview: View {
+  let item: ClipboardItem
+
+  private var content: ClipboardTextPreviewContent {
+    ClipboardPreviewLoader.textPreview(for: item.text)
+  }
+
+  var body: some View {
+    VStack(spacing: 0) {
+      AppKitScrollableTextView(
+        itemID: item.id,
+        text: content.text
+      )
+
+      if content.isTruncated {
+        Divider().opacity(0.25)
+        HStack(spacing: 7) {
+          Image(systemName: "text.badge.ellipsis")
+          Text("内容过长，仅预览前 20 万字符；复制和粘贴仍使用完整内容")
+          Spacer()
+        }
+        .font(.system(size: 10.5))
+        .foregroundStyle(.secondary)
+        .padding(.horizontal, 14)
+        .frame(height: 34)
+        .background(Color.white.opacity(0.025))
+      }
+    }
+  }
+}
+
+private struct AppKitScrollableTextView: NSViewRepresentable {
+  let itemID: UUID
+  let text: String
+
+  final class Coordinator {
+    var itemID: UUID?
+  }
+
+  func makeCoordinator() -> Coordinator {
+    Coordinator()
+  }
+
+  func makeNSView(context: Context) -> NSScrollView {
+    let scrollView = NSScrollView()
+    scrollView.drawsBackground = false
+    scrollView.hasVerticalScroller = true
+    scrollView.hasHorizontalScroller = false
+    scrollView.autohidesScrollers = true
+    scrollView.borderType = .noBorder
+
+    let contentSize = scrollView.contentSize
+    let textView = NSTextView(frame: NSRect(origin: .zero, size: contentSize))
+    textView.minSize = NSSize(width: 0, height: contentSize.height)
+    textView.maxSize = NSSize(
+      width: CGFloat.greatestFiniteMagnitude,
+      height: CGFloat.greatestFiniteMagnitude
+    )
+    textView.isVerticallyResizable = true
+    textView.isHorizontallyResizable = false
+    textView.autoresizingMask = [.width]
+    textView.textContainer?.containerSize = NSSize(
+      width: contentSize.width,
+      height: CGFloat.greatestFiniteMagnitude
+    )
+    textView.textContainer?.widthTracksTextView = true
+    textView.textContainerInset = NSSize(width: 18, height: 18)
+    textView.isEditable = false
+    textView.isSelectable = true
+    textView.isRichText = false
+    textView.allowsUndo = false
+    textView.drawsBackground = false
+    textView.textColor = .labelColor
+    textView.font = .systemFont(ofSize: 13.5)
+    textView.string = text
+
+    scrollView.documentView = textView
+    context.coordinator.itemID = itemID
+    return scrollView
+  }
+
+  func updateNSView(_ scrollView: NSScrollView, context: Context) {
+    guard context.coordinator.itemID != itemID,
+      let textView = scrollView.documentView as? NSTextView
+    else {
+      return
+    }
+    textView.string = text
+    textView.scrollToBeginningOfDocument(nil)
+    context.coordinator.itemID = itemID
+  }
+}
+
 private struct ClipboardImagePreview: View {
   let item: ClipboardItem
   @ObservedObject var history: ClipboardHistory
 
-  private var image: NSImage? {
-    history.imageData(for: item).flatMap(NSImage.init(data:))
-  }
+  @State private var image: NSImage?
+  @State private var isLoading = true
 
   var body: some View {
     ZStack {
       Color.white.opacity(0.025)
 
-      if let image {
+      if isLoading {
+        VStack(spacing: 10) {
+          ProgressView()
+            .controlSize(.small)
+          Text("正在生成图片预览…")
+            .font(.system(size: 12))
+            .foregroundStyle(.secondary)
+        }
+      } else if let image {
         Image(nsImage: image)
           .resizable()
           .interpolation(.high)
@@ -380,6 +472,18 @@ private struct ClipboardImagePreview: View {
             .foregroundStyle(.secondary)
         }
       }
+    }
+    .task(id: item.id) {
+      image = nil
+      isLoading = true
+      guard let url = history.imageFileURL(for: item) else {
+        isLoading = false
+        return
+      }
+      let thumbnail = await ClipboardPreviewLoader.imageThumbnail(at: url)
+      guard !Task.isCancelled else { return }
+      image = thumbnail
+      isLoading = false
     }
   }
 }

@@ -108,13 +108,13 @@ final class ClipboardHistory: ObservableObject {
   }
 
   func imageData(for item: ClipboardItem) -> Data? {
-    guard item.kind == .image,
-      let fileName = item.imageFileName,
-      let url = imageURL(fileName: fileName)
-    else {
-      return nil
-    }
+    guard let url = imageFileURL(for: item) else { return nil }
     return try? Data(contentsOf: url, options: .mappedIfSafe)
+  }
+
+  func imageFileURL(for item: ClipboardItem) -> URL? {
+    guard item.kind == .image, let fileName = item.imageFileName else { return nil }
+    return imageURL(fileName: fileName)
   }
 
   func markUsed(_ item: ClipboardItem, at date: Date = Date()) {

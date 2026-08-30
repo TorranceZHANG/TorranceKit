@@ -12,6 +12,13 @@ final class PickerPanelController: NSObject, NSWindowDelegate {
   private var targetApplication: NSRunningApplication?
   private var lastExternalApplication: NSRunningApplication?
   private var activationObserver: NSObjectProtocol?
+  private var activeSpaceObserver: NSObjectProtocol?
+
+  static let collectionBehavior: NSWindow.CollectionBehavior = [
+    .moveToActiveSpace,
+    .transient,
+    .fullScreenAuxiliary,
+  ]
 
   init(
     history: ClipboardHistory,
@@ -36,7 +43,7 @@ final class PickerPanelController: NSObject, NSWindowDelegate {
     panel.isOpaque = false
     panel.backgroundColor = .clear
     panel.hasShadow = true
-    panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+    panel.collectionBehavior = Self.collectionBehavior
     panel.isMovableByWindowBackground = true
 
     let view = PickerView(
@@ -70,6 +77,18 @@ final class PickerPanelController: NSObject, NSWindowDelegate {
       }
       MainActor.assumeIsolated {
         self?.rememberExternalApplication(application)
+        if application.processIdentifier != ProcessInfo.processInfo.processIdentifier {
+          self?.hide()
+        }
+      }
+    }
+    activeSpaceObserver = NSWorkspace.shared.notificationCenter.addObserver(
+      forName: NSWorkspace.activeSpaceDidChangeNotification,
+      object: nil,
+      queue: .main
+    ) { [weak self] _ in
+      MainActor.assumeIsolated {
+        self?.hide()
       }
     }
   }
@@ -80,6 +99,9 @@ final class PickerPanelController: NSObject, NSWindowDelegate {
     }
     if let activationObserver {
       NSWorkspace.shared.notificationCenter.removeObserver(activationObserver)
+    }
+    if let activeSpaceObserver {
+      NSWorkspace.shared.notificationCenter.removeObserver(activeSpaceObserver)
     }
   }
 

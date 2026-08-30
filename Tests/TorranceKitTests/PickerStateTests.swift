@@ -48,4 +48,29 @@ final class PickerStateTests: XCTestCase {
 
     XCTAssertEqual(state.filteredItems(from: [ClipboardItem(text: "hello"), image]), [image])
   }
+
+  func testBackgroundInstallerLaunchDoesNotShowPicker() {
+    XCTAssertFalse(
+      AppLaunchBehavior.shouldShowPicker(
+        arguments: ["TorranceKit", AppLaunchBehavior.backgroundLaunchArgument]
+      )
+    )
+    XCTAssertTrue(AppLaunchBehavior.shouldShowPicker(arguments: ["TorranceKit"]))
+  }
+
+  func testPickerOnlyMovesToTheActiveSpace() {
+    let behavior = PickerPanelController.collectionBehavior
+    XCTAssertTrue(behavior.contains(.moveToActiveSpace))
+    XCTAssertTrue(behavior.contains(.transient))
+    XCTAssertFalse(behavior.contains(.canJoinAllSpaces))
+  }
+
+  func testLongTextPreviewIsBoundedWithoutChangingTheOriginal() {
+    let text = String(repeating: "a", count: 200_001)
+    let preview = ClipboardPreviewLoader.textPreview(for: text)
+
+    XCTAssertTrue(preview.isTruncated)
+    XCTAssertEqual(preview.text.count, 200_000)
+    XCTAssertEqual(text.count, 200_001)
+  }
 }

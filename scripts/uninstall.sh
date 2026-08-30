@@ -20,7 +20,20 @@ system_app="/Applications/TorranceKit.app"
 trash_dir="$HOME/.Trash"
 trash_app="$trash_dir/TorranceKit-$(date +%Y%m%d-%H%M%S)-$$.app"
 
-osascript -e 'tell application "TorranceKit" to quit' >/dev/null 2>&1 || true
+if pgrep -x TorranceKit >/dev/null 2>&1; then
+    osascript \
+        -e 'with timeout of 3 seconds' \
+        -e 'tell application "TorranceKit" to quit' \
+        -e 'end timeout' >/dev/null 2>&1 || true
+    for attempt in {1..30}; do
+        pgrep -x TorranceKit >/dev/null 2>&1 || break
+        sleep 0.1
+    done
+    if pgrep -x TorranceKit >/dev/null 2>&1; then
+        echo "无法安全退出 TorranceKit，请手动退出后重新运行卸载脚本。" >&2
+        exit 1
+    fi
+fi
 mkdir -p "$trash_dir"
 
 if [[ -e "$user_app" ]]; then

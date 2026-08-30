@@ -24,15 +24,17 @@ TorranceKit 是一款面向 Apple Silicon Mac 的开源原生效率工具库。�
 ### 一键安装（无需 clone）
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/TorranceZHANG/TorranceKit/main/install.sh | zsh
+curl -fL --connect-timeout 15 --max-time 60 \
+  https://raw.githubusercontent.com/TorranceZHANG/TorranceKit/main/install.sh | zsh
 ```
 
-脚本会优先下载并校验最新 GitHub Release，安装到 `~/Applications/TorranceKit.app`。尚无 Release 时，会自动下载 `main` 源码快照并本地构建，该降级路径需要完整 Xcode，但同样不使用 `git clone`。
+脚本会优先下载并校验最新 GitHub Release，安装到 `~/Applications/TorranceKit.app`，完成后在后台启动菜单栏进程但不主动弹出选择器。尚无 Release 时，会自动下载 `main` 源码快照并本地构建，该降级路径需要完整 Xcode，但同样不使用 `git clone`。
 
 安装到系统的 `/Applications`：
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/TorranceZHANG/TorranceKit/main/install.sh | zsh -s -- --system
+curl -fL --connect-timeout 15 --max-time 60 \
+  https://raw.githubusercontent.com/TorranceZHANG/TorranceKit/main/install.sh | zsh -s -- --system
 ```
 
 如需先审阅脚本，可单独下载后再执行：
@@ -47,16 +49,18 @@ zsh install.sh
 检查并安装最新正式版本，无需 clone：
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/TorranceZHANG/TorranceKit/main/update.sh | zsh
+curl -fL --connect-timeout 15 --max-time 60 \
+  https://raw.githubusercontent.com/TorranceZHANG/TorranceKit/main/update.sh | zsh
 ```
 
 只检查、不安装：
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/TorranceZHANG/TorranceKit/main/update.sh | zsh -s -- --check
+curl -fL --connect-timeout 15 --max-time 60 \
+  https://raw.githubusercontent.com/TorranceZHANG/TorranceKit/main/update.sh | zsh -s -- --check
 ```
 
-更新脚本会自动查找 `~/Applications` 或 `/Applications` 中已安装的 TorranceKit，比较语义化版本号，只下载更新的 GitHub Release，并继续校验 SHA-256、Bundle ID、arm64 架构和代码签名。相同版本不会重复安装；需要修复安装时可追加 `--force`。更新只使用正式 Release，不会退回到 `main` 源码构建。
+更新脚本会自动查找 `~/Applications` 或 `/Applications` 中已安装的 TorranceKit，比较语义化版本号，只下载更新的 GitHub Release，并继续校验 SHA-256、Bundle ID、arm64 架构和代码签名。下载过程会显示进度并设置超时；相同版本不会重复安装，需要修复安装时可追加 `--force`。更新只使用正式 Release，不会退回到 `main` 源码构建。
 
 如果两个位置都安装了 TorranceKit，默认更新用户目录中的版本；追加 `--system` 可明确更新 `/Applications` 中的版本。
 
@@ -102,7 +106,9 @@ CODE_SIGN_IDENTITY="Developer ID Application: Your Name (TEAMID)" ./scripts/buil
 3. 左侧单击条目，右侧查看完整文本或图片预览。
 4. 按回车、双击条目，或直接按 `⌘1…9` 完成复制/粘贴。
 
-列表支持触控板和鼠标滚轮自然滚动。滚动时鼠标经过条目只更新悬停高亮，不会把页面自动拉回；使用 `↑` / `↓` 键选择时才会自动滚动到选中项。
+列表支持触控板和鼠标滚轮自然滚动。滚动时鼠标经过条目只更新悬停高亮，不会把页面自动拉回；使用 `↑` / `↓` 键选择时才会自动滚动到选中项。切换到其他应用或桌面时选择器会自动隐藏，也可以使用 `Esc` 或右上角关闭按钮隐藏。
+
+为防止异常大的内容阻塞界面，超过 20 万字符的文本只在右侧预览前 20 万字符，复制和粘贴仍使用完整内容；图片预览会在后台生成最长边不超过 1600 像素的缩略图，原图保存和粘贴不受影响。
 
 ### 菜单栏图标被刘海挡住时
 

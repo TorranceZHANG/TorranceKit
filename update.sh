@@ -17,8 +17,11 @@ cleanup() {
 trap cleanup EXIT INT TERM
 
 installer="$temporary_directory/install.sh"
-curl --fail --silent --show-error --location --retry 3 \
+echo "正在获取 TorranceKit 更新程序…"
+curl --fail --show-error --location --retry 3 \
     --connect-timeout 15 \
+    --max-time 60 \
+    --progress-bar \
     --output "$installer" \
     "https://raw.githubusercontent.com/$repository/main/install.sh"
 

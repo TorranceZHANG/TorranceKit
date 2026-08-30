@@ -141,6 +141,25 @@ final class ClipboardImageTests: XCTestCase {
     XCTAssertNotNil(pasteboard.data(forType: .tiff))
   }
 
+  func testImagePreviewLoaderBuildsThumbnailOffTheHistoryPath() async throws {
+    let pngData = try makePNGData(red: 0.12, green: 0.48, blue: 0.95)
+    let imageURL = temporaryDirectory.appendingPathComponent("preview.png")
+    try FileManager.default.createDirectory(
+      at: temporaryDirectory,
+      withIntermediateDirectories: true
+    )
+    try pngData.write(to: imageURL)
+
+    let image = await ClipboardPreviewLoader.imageThumbnail(
+      at: imageURL,
+      maximumPixelSize: 2
+    )
+
+    XCTAssertNotNil(image)
+    XCTAssertLessThanOrEqual(image?.size.width ?? 0, 2)
+    XCTAssertLessThanOrEqual(image?.size.height ?? 0, 2)
+  }
+
   private func makeHistory() -> ClipboardHistory {
     ClipboardHistory(
       maxItems: 10,

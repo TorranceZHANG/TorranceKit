@@ -1,6 +1,14 @@
 import AppKit
 import SwiftUI
 
+enum AppLaunchBehavior {
+  static let backgroundLaunchArgument = "--background-launch"
+
+  static func shouldShowPicker(arguments: [String] = ProcessInfo.processInfo.arguments) -> Bool {
+    !arguments.contains(backgroundLaunchArgument)
+  }
+}
+
 @main
 struct TorranceKitApp: App {
   @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
@@ -19,6 +27,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
   func applicationDidFinishLaunching(_ notification: Notification) {
     NSApp.setActivationPolicy(.accessory)
     AppModel.shared.start()
+    guard AppLaunchBehavior.shouldShowPicker() else { return }
     // Let the menu-bar scene finish launching before making the accessory panel key.
     // Showing it in the same run-loop turn can make macOS immediately resign and hide it.
     DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {

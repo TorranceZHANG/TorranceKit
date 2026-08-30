@@ -5,11 +5,23 @@ set -euo pipefail
 project_dir="${0:A:h:h}"
 installer="$project_dir/install.sh"
 updater="$project_dir/update.sh"
+source_installer="$project_dir/scripts/install.sh"
+uninstaller="$project_dir/scripts/uninstall.sh"
 
-zsh -n "$installer" "$updater"
+zsh -n "$installer" "$updater" "$source_installer" "$uninstaller"
 
 help_text="$(zsh "$installer" --help)"
 [[ "$help_text" == *"--update"* && "$help_text" == *"--check"* ]]
+
+installer_text="$(<"$installer")"
+updater_text="$(<"$updater")"
+[[ "$installer_text" == *"--max-time 60"* ]]
+[[ "$installer_text" == *"--max-time 900"* ]]
+[[ "$installer_text" == *"--progress-bar"* ]]
+[[ "$updater_text" == *"--max-time 60"* ]]
+[[ "$updater_text" == *"--progress-bar"* ]]
+[[ "$installer_text" == *"--background-launch"* ]]
+[[ "$(<"$source_installer")" == *"--background-launch"* ]]
 
 if zsh "$installer" --version invalid >/dev/null 2>&1; then
     echo "安装脚本接受了无效版本号" >&2
