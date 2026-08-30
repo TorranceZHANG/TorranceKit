@@ -9,6 +9,8 @@ final class PickerPanelController: NSObject, NSWindowDelegate {
   private var panel: PickerPanel!
   private var keyboardMonitor: Any?
   private var targetApplication: NSRunningApplication?
+  private var lastExternalApplication: NSRunningApplication?
+  private var activationObserver: NSObjectProtocol?
 
   init(
     history: ClipboardHistory,
@@ -49,11 +51,31 @@ final class PickerPanelController: NSObject, NSWindowDelegate {
     hostingView.layer?.masksToBounds = true
     panel.contentView = hostingView
     self.panel = panel
+
+    rememberExternalApplication(NSWorkspace.shared.frontmostApplication)
+    activationObserver = NSWorkspace.shared.notificationCenter.addObserver(
+      forName: NSWorkspace.didActivateApplicationNotification,
+      object: nil,
+      queue: .main
+    ) { [weak self] notification in
+      guard
+        let application = notification.userInfo?[NSWorkspace.applicationUserInfoKey]
+          as? NSRunningApplication
+      else {
+        return
+      }
+      MainActor.assumeIsolated {
+        self?.rememberExternalApplication(application)
+      }
+    }
   }
 
   deinit {
     if let keyboardMonitor {
       NSEvent.removeMonitor(keyboardMonitor)
+    }
+    if let activationObserver {
+      NSWorkspace.shared.notificationCenter.removeObserver(activationObserver)
     }
   }
 
@@ -66,6 +88,9 @@ final class PickerPanelController: NSObject, NSWindowDelegate {
     let currentApplication = NSWorkspace.shared.frontmostApplication
     if currentApplication?.processIdentifier != ProcessInfo.processInfo.processIdentifier {
       targetApplication = currentApplication
+      rememberExternalApplication(currentApplication)
+    } else if lastExternalApplication?.isTerminated == false {
+      targetApplication = lastExternalApplication
     } else {
       targetApplication = nil
     }
@@ -94,6 +119,17 @@ final class PickerPanelController: NSObject, NSWindowDelegate {
     let target = targetApplication
     hide()
     onSelect(item, target)
+  }
+
+  private func rememberExternalApplication(_ application: NSRunningApplication?) {
+    guard
+      let application,
+      application.processIdentifier != ProcessInfo.processInfo.processIdentifier,
+      !application.isTerminated
+    else {
+      return
+    }
+    lastExternalApplication = application
   }
 
   private func positionPanel() {

@@ -11,6 +11,7 @@ TorranceKit 是一款面向 Apple Silicon Mac 的开源原生效率工具库。�
 - 输入即搜索，支持 `↑` / `↓`、回车、`⌘1…9` 和鼠标操作
 - 获得辅助功能权限后，选中即粘贴；未授权时安全降级为“选中即复制”
 - 常驻菜单栏，可暂停记录、清空历史和退出
+- 默认同时显示程序坞图标，刘海或菜单栏空间不足时仍有稳定入口，并可在设置中关闭
 - 保留条数、保留时间、单条大小、监听频率和粘贴行为均可配置
 - 可按 Bundle ID 跳过前台应用中的复制内容
 - 跳过密码管理器常用的临时、机密剪贴板类型
@@ -81,6 +82,12 @@ CODE_SIGN_IDENTITY="Developer ID Application: Your Name (TEAMID)" ./scripts/buil
 2. 在要输入文字的位置按 `⌥V`。
 3. 输入关键词过滤，使用方向键选择后按回车，或直接按 `⌘1…9`。
 
+### 菜单栏图标被刘海挡住时
+
+macOS 会在菜单栏空间不足时隐藏部分状态项，应用本身无法强制占据最右侧位置。TorranceKit 默认同时提供程序坞图标；点击它可以重新打开剪贴板，选择内容后仍会返回最近使用的应用继续粘贴。也可以直接使用全局快捷键，它不依赖菜单栏图标是否可见。
+
+在“设置 → 高级 → 应用入口”中可以关闭程序坞图标。菜单栏图标当前可见时，也可以按住 `⌘` 将它向右拖动，降低被刘海或其他状态项挤出的概率。
+
 ## 本地数据
 
 历史和配置分别保存在：
@@ -129,7 +136,8 @@ TorranceKit 不联网、不上传内容。暂停记录期间产生的剪贴板�
   "maxTextBytes": 1048576,
   "pasteDelayMilliseconds": 160,
   "pollIntervalMilliseconds": 450,
-  "retentionDays": 30
+  "retentionDays": 30,
+  "showDockIcon": true
 }
 ```
 
@@ -147,6 +155,7 @@ TorranceKit 不联网、不上传内容。暂停记录期间产生的剪贴板�
 | `autoPaste` | 布尔值 | 是否在选择后自动向原应用发送 `⌘V` |
 | `pasteDelayMilliseconds` | `50...2000` | 恢复原应用后等待多久再粘贴 |
 | `excludedBundleIdentifiers` | 字符串数组 | 当前台应用匹配时跳过记录，例如 `com.example.SecretApp` |
+| `showDockIcon` | 布尔值 | 是否显示程序坞图标；刘海屏或菜单栏项目较多时建议开启 |
 
 `maxItems` 和 `retentionDays` 同时设置时，两项约束同时生效。两项都设为 `null` 会永久累计历史，请结合磁盘和隐私风险谨慎使用。
 
@@ -198,6 +207,8 @@ TorranceKit 不联网、不上传内容。暂停记录期间产生的剪贴板�
 make test
 make build
 ```
+
+当前版本记录在根目录的 `VERSION` 文件中，构建后的应用会在菜单栏和“设置 → 高级 → 关于”中显示版本号。发布标签必须与该文件一致，例如 `VERSION` 为 `0.1.0` 时使用 `v0.1.0`。
 
 工程使用 SwiftUI、AppKit、Carbon Hot Key 和 CoreGraphics，不依赖第三方库。`make test` 会同时运行核心独立测试和 SwiftPM XCTest，并在新版 Xcode 中显式选用 XCTest 运行器。
 

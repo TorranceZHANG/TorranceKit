@@ -20,17 +20,17 @@ Secret 只能通过 GitHub 界面或受控的仓库管理流程录入，不要�
 
 ## 发版步骤
 
-1. 更新 `CHANGELOG.md`，把 Unreleased 内容归入目标版本。
-2. 确认 `Resources/Info.plist` 的默认版本与目标版本一致；工作流还会用标签版本覆盖它。
+1. 更新根目录的 `VERSION` 和 `CHANGELOG.md`；`VERSION` 使用不带 `v` 的语义化版本号，例如 `0.1.0`。
+2. 构建脚本会把 `VERSION` 写入 App 的 `Info.plist`，发布工作流会拒绝版本不一致的标签，无需维护第二份版本号。
 3. 在干净工作区执行 `make test && make build`。
-4. 创建并推送语义化版本标签，例如 `v0.1.0`。
+4. 创建并推送与 `VERSION` 对应的语义化版本标签，例如 `v0.1.0`。
 5. `Release` 工作流会测试、构建、Developer ID 签名、公证、装订票据，并创建带 zip 和 SHA-256 校验文件的 GitHub Release。
 6. 下载 Release 产物，在另一台未安装开发证书的 Apple Silicon Mac 上验证安装、权限、快捷键和粘贴。
 
 本地仅打包 ad-hoc 签名版本可执行：
 
 ```bash
-./scripts/package_release.sh 0.1.0
+./scripts/package_release.sh
 ```
 
 ad-hoc 产物适合本地测试，不适合作为面向普通用户的公开下载。

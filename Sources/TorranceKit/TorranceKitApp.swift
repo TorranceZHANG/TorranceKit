@@ -17,8 +17,15 @@ struct TorranceKitApp: App {
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
   func applicationDidFinishLaunching(_ notification: Notification) {
-    NSApp.setActivationPolicy(.accessory)
     AppModel.shared.start()
+  }
+
+  func applicationShouldHandleReopen(
+    _ sender: NSApplication,
+    hasVisibleWindows flag: Bool
+  ) -> Bool {
+    AppModel.shared.showPicker()
+    return false
   }
 
   func applicationWillTerminate(_ notification: Notification) {
@@ -48,6 +55,14 @@ private struct TorranceKitMenuView: View {
 
     Toggle("记录剪贴板", isOn: $model.isCaptureEnabled)
 
+    Toggle(
+      "在程序坞显示图标",
+      isOn: Binding(
+        get: { configuration.settings.showDockIcon },
+        set: { model.setDockIconVisible($0) }
+      )
+    )
+
     if configuration.settings.autoPaste && !permission.isTrusted {
       Button("开启自动粘贴权限…") {
         permission.request()
@@ -65,6 +80,10 @@ private struct TorranceKitMenuView: View {
       model.showSettings()
     }
     .keyboardShortcut(",", modifiers: .command)
+
+    Divider()
+
+    Text("TorranceKit · \(AppVersion.displayText)")
 
     Divider()
 

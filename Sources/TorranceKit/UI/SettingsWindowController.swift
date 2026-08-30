@@ -28,7 +28,7 @@ final class SettingsWindowController: NSWindowController {
       rootView: SettingsView(model: settingsViewModel, permission: appModel.permission)
     )
     let window = NSWindow(contentViewController: hostingController)
-    window.title = "TorranceKit 设置"
+    window.title = "TorranceKit 设置 · \(AppVersion.shortVersion)"
     window.styleMask = [.titled, .closable, .miniaturizable, .resizable]
     window.minSize = NSSize(width: 660, height: 600)
     window.setContentSize(NSSize(width: 720, height: 680))

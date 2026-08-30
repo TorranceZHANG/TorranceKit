@@ -143,6 +143,7 @@ struct AppSettings: Codable, Equatable {
   var maxItems: Int?
   var retentionDays: Int?
   var hotKey: HotKeyConfiguration
+  var showDockIcon: Bool
   var maxTextBytes: Int
   var pollIntervalMilliseconds: Int
   var autoPaste: Bool
@@ -153,6 +154,7 @@ struct AppSettings: Codable, Equatable {
     maxItems: 1_000,
     retentionDays: 30,
     hotKey: .default,
+    showDockIcon: true,
     maxTextBytes: 1_048_576,
     pollIntervalMilliseconds: 450,
     autoPaste: true,
@@ -195,7 +197,7 @@ struct AppSettings: Codable, Equatable {
   }
 
   private enum CodingKeys: String, CodingKey {
-    case maxItems, retentionDays, hotKey, maxTextBytes
+    case maxItems, retentionDays, hotKey, showDockIcon, maxTextBytes
     case pollIntervalMilliseconds, autoPaste, pasteDelayMilliseconds
     case excludedBundleIdentifiers
   }
@@ -204,6 +206,7 @@ struct AppSettings: Codable, Equatable {
     maxItems: Int?,
     retentionDays: Int?,
     hotKey: HotKeyConfiguration,
+    showDockIcon: Bool,
     maxTextBytes: Int,
     pollIntervalMilliseconds: Int,
     autoPaste: Bool,
@@ -213,6 +216,7 @@ struct AppSettings: Codable, Equatable {
     self.maxItems = maxItems
     self.retentionDays = retentionDays
     self.hotKey = hotKey
+    self.showDockIcon = showDockIcon
     self.maxTextBytes = maxTextBytes
     self.pollIntervalMilliseconds = pollIntervalMilliseconds
     self.autoPaste = autoPaste
@@ -234,6 +238,9 @@ struct AppSettings: Codable, Equatable {
     hotKey =
       try container.decodeIfPresent(HotKeyConfiguration.self, forKey: .hotKey)
       ?? defaults.hotKey
+    showDockIcon =
+      try container.decodeIfPresent(Bool.self, forKey: .showDockIcon)
+      ?? defaults.showDockIcon
     maxTextBytes =
       try container.decodeIfPresent(Int.self, forKey: .maxTextBytes)
       ?? defaults.maxTextBytes
@@ -270,6 +277,7 @@ struct AppSettings: Codable, Equatable {
       try container.encodeNil(forKey: .retentionDays)
     }
     try container.encode(hotKey, forKey: .hotKey)
+    try container.encode(showDockIcon, forKey: .showDockIcon)
     try container.encode(maxTextBytes, forKey: .maxTextBytes)
     try container.encode(pollIntervalMilliseconds, forKey: .pollIntervalMilliseconds)
     try container.encode(autoPaste, forKey: .autoPaste)

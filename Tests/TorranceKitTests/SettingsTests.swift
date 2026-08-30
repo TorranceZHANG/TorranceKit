@@ -7,6 +7,7 @@ final class SettingsTests: XCTestCase {
     var settings = AppSettings.default
     settings.maxItems = nil
     settings.retentionDays = 14
+    settings.showDockIcon = false
     settings.hotKey = HotKeyConfiguration(
       key: "K",
       modifiers: ["command", "shift"]
@@ -25,6 +26,7 @@ final class SettingsTests: XCTestCase {
 
     XCTAssertNil(result.maxItems)
     XCTAssertEqual(result.retentionDays, 14)
+    XCTAssertFalse(result.showDockIcon)
     XCTAssertEqual(result.hotKey.key, "K")
     XCTAssertEqual(Set(result.hotKey.modifiers), ["command", "shift"])
     XCTAssertEqual(

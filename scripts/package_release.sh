@@ -3,7 +3,8 @@
 set -euo pipefail
 
 project_dir="${0:A:h:h}"
-version="${1:-0.1.0}"
+default_version="$(tr -d '[:space:]' < "$project_dir/VERSION")"
+version="${1:-$default_version}"
 archive="$project_dir/dist/TorranceKit-$version-macOS-arm64.zip"
 
 APP_VERSION="$version" "$project_dir/scripts/build_app.sh"

@@ -3,6 +3,7 @@
 set -euo pipefail
 
 project_dir="${0:A:h:h}"
+version_file="$project_dir/VERSION"
 configuration="${CONFIGURATION:-release}"
 app_name="TorranceKit"
 bundle_dir="$project_dir/dist/$app_name.app"
@@ -11,7 +12,8 @@ binary_path="$build_dir/$app_name"
 signing_identity="${CODE_SIGN_IDENTITY:--}"
 sdk_path="${TORRANCEKIT_SDK_PATH:-$(xcrun --sdk macosx --show-sdk-path)}"
 source_files=("$project_dir"/Sources/TorranceKit/**/*.swift(N))
-app_version="${APP_VERSION:-0.1.0}"
+default_app_version="$(tr -d '[:space:]' < "$version_file")"
+app_version="${APP_VERSION:-$default_app_version}"
 build_number="${BUILD_NUMBER:-1}"
 
 if [[ ! "$app_version" =~ '^[0-9]+(\.[0-9]+){1,2}$' ]]; then
@@ -48,8 +50,8 @@ cp "$binary_path" "$bundle_dir/Contents/MacOS/$app_name"
 cp "$project_dir/Resources/Info.plist" "$bundle_dir/Contents/Info.plist"
 "$project_dir/scripts/generate_icon.sh" "$bundle_dir/Contents/Resources/TorranceKit.icns"
 /usr/libexec/PlistBuddy \
-    -c "Set :CFBundleShortVersionString $app_version" \
-    -c "Set :CFBundleVersion $build_number" \
+    -c "Add :CFBundleShortVersionString string $app_version" \
+    -c "Add :CFBundleVersion string $build_number" \
     "$bundle_dir/Contents/Info.plist"
 
 signing_arguments=(

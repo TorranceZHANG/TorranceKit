@@ -77,6 +77,10 @@ final class AppModel: ObservableObject {
   func start() {
     guard !hasStarted else { return }
     hasStarted = true
+    // Start tracking the current external application before making the Dock icon visible.
+    // Otherwise the first Dock click would lose the application that should receive the paste.
+    _ = panelController
+    applyDockIconVisibility(configuration.settings.showDockIcon)
     monitor.start()
   }
 
@@ -107,6 +111,21 @@ final class AppModel: ObservableObject {
 
   func showSettings() {
     settingsWindowController.show()
+  }
+
+  func setDockIconVisible(_ isVisible: Bool) {
+    guard configuration.settings.showDockIcon != isVisible else { return }
+    var settings = configuration.settings
+    settings.showDockIcon = isVisible
+    do {
+      try saveConfiguration(settings)
+    } catch {
+      showAlert(
+        title: "无法更新程序坞设置",
+        message: error.localizedDescription,
+        style: .warning
+      )
+    }
   }
 
   func openConfiguration() {
@@ -162,8 +181,17 @@ final class AppModel: ObservableObject {
 
   private func applyConfiguration(_ newSettings: AppSettings) {
     configuration.apply(newSettings)
+    applyDockIconVisibility(newSettings.showDockIcon)
     history.applyRetentionPolicy(newSettings.retentionPolicy)
     monitor.apply(settings: newSettings)
+  }
+
+  private func applyDockIconVisibility(_ isVisible: Bool) {
+    let policy: NSApplication.ActivationPolicy = isVisible ? .regular : .accessory
+    guard NSApp.activationPolicy() != policy else { return }
+    if !NSApp.setActivationPolicy(policy) {
+      NSLog("TorranceKit: failed to change activation policy")
+    }
   }
 
   private func select(

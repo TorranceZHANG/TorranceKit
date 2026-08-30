@@ -46,6 +46,11 @@ jobs:
         run: |
           make test
           version="${GITHUB_REF_NAME#v}"
+          project_version="$(tr -d '[:space:]' < VERSION)"
+          if [[ "$version" != "$project_version" ]]; then
+            echo "::error::标签版本 $version 与 VERSION 文件 $project_version 不一致"
+            exit 1
+          fi
           APP_VERSION="$version" BUILD_NUMBER="$GITHUB_RUN_NUMBER" CODE_SIGN_IDENTITY="$DEVELOPER_ID_APPLICATION" ./scripts/build_app.sh
           ditto -c -k --norsrc --keepParent dist/TorranceKit.app "$RUNNER_TEMP/TorranceKit-notarize.zip"
 

@@ -148,6 +148,7 @@ enum CoreTestRunner {
     try expect(settings.maxItems == nil, "explicit unlimited item count")
     try expect(settings.retentionDays == 7, "configured retention days")
     try expect(settings.hotKey == .default, "default hot key")
+    try expect(settings.showDockIcon, "default dock icon visibility")
     try expect(settings.maxTextBytes == AppSettings.default.maxTextBytes, "default max bytes")
   }
 
