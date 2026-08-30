@@ -114,7 +114,10 @@ install_release() {
     local release_tag
     if [[ "$requested_version" == "latest" ]]; then
         local release_metadata="$temporary_directory/release.json"
-        download "https://api.github.com/repos/$repository/releases/latest" "$release_metadata" \
+        curl --fail --silent --location --retry 2 \
+            --connect-timeout 15 \
+            --output "$release_metadata" \
+            "https://api.github.com/repos/$repository/releases/latest" \
             || return 1
         release_tag="$(plutil -extract tag_name raw -o - "$release_metadata" 2>/dev/null)"
         [[ -n "$release_tag" ]] || return 1
