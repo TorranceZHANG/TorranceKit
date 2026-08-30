@@ -6,14 +6,24 @@ repository="${TORRANCEKIT_GITHUB_REPOSITORY:-TorranceZHANG/TorranceKit}"
 requested_version="latest"
 install_root="$HOME/Applications"
 force_source=false
+update_only=false
+check_only=false
+force_reinstall=false
+system_install_requested=false
+current_version=""
 
 usage() {
     cat <<'EOF'
 用法：install.sh [--version <版本>] [--system] [--source]
+      install.sh --update [--system] [--force]
+      install.sh --check [--system]
 
   --version <版本>  安装指定 Release，例如 0.1.0 或 v0.1.0
   --system          安装到 /Applications（需要 sudo）
   --source          跳过 Release，直接下载 main 源码快照构建
+  --update          仅在存在更新的正式 Release 时安装
+  --check           只检查是否存在更新，不修改已安装的 App
+  --force           配合 --update，重新安装相同版本
   -h, --help        显示帮助
 
 环境变量：
@@ -30,10 +40,24 @@ while [[ $# -gt 0 ]]; do
             ;;
         --system)
             install_root="/Applications"
+            system_install_requested=true
             shift
             ;;
         --source)
             force_source=true
+            shift
+            ;;
+        --update)
+            update_only=true
+            shift
+            ;;
+        --check)
+            update_only=true
+            check_only=true
+            shift
+            ;;
+        --force)
+            force_reinstall=true
             shift
             ;;
         -h|--help)
@@ -48,9 +72,54 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
+if [[ "$requested_version" != "latest" && ! "$requested_version" =~ '^v?[0-9]+(\.[0-9]+){1,2}$' ]]; then
+    echo "--version 必须是数字版本号，例如 0.1.0 或 v0.1.0" >&2
+    exit 2
+fi
+if [[ "$update_only" == true && "$requested_version" != "latest" ]]; then
+    echo "--update/--check 不能与 --version 同时使用" >&2
+    exit 2
+fi
+if [[ "$update_only" == true && "$force_source" == true ]]; then
+    echo "--update/--check 只使用正式 Release，不能与 --source 同时使用" >&2
+    exit 2
+fi
+if [[ "$force_reinstall" == true && "$update_only" == false ]]; then
+    echo "--force 只能与 --update 一起使用" >&2
+    exit 2
+fi
+if [[ "$check_only" == true && "$force_reinstall" == true ]]; then
+    echo "--check 不能与 --force 同时使用" >&2
+    exit 2
+fi
+
 if [[ "$(uname -s)" != "Darwin" || "$(uname -m)" != "arm64" ]]; then
     echo "TorranceKit 目前仅支持 Apple Silicon Mac。" >&2
     exit 1
+fi
+
+if [[ "$update_only" == true ]]; then
+    user_app="$HOME/Applications/TorranceKit.app"
+    system_app="/Applications/TorranceKit.app"
+
+    if [[ "$system_install_requested" == true ]]; then
+        [[ -d "$system_app" ]] \
+            || { echo "没有在 /Applications 中找到 TorranceKit.app。" >&2; exit 1; }
+    elif [[ -d "$user_app" ]]; then
+        install_root="$HOME/Applications"
+    elif [[ -d "$system_app" ]]; then
+        install_root="/Applications"
+    else
+        echo "没有找到已安装的 TorranceKit，请先运行安装脚本。" >&2
+        exit 1
+    fi
+
+    installed_app="$install_root/TorranceKit.app"
+    current_version="$(plutil -extract CFBundleShortVersionString raw "$installed_app/Contents/Info.plist" 2>/dev/null || true)"
+    if [[ ! "$current_version" =~ '^[0-9]+(\.[0-9]+){1,2}$' ]]; then
+        echo "无法读取已安装 TorranceKit 的版本号：$installed_app" >&2
+        exit 1
+    fi
 fi
 
 temporary_directory="$(mktemp -d "${TMPDIR:-/tmp}/torrancekit-install.XXXXXX")"
@@ -66,6 +135,42 @@ download() {
         --connect-timeout 15 \
         --output "$destination" \
         "$url"
+}
+
+resolve_latest_release_tag() {
+    local effective_url
+    effective_url="$(
+        curl --fail --silent --show-error --location --retry 2 \
+            --connect-timeout 15 \
+            --output /dev/null \
+            --write-out '%{url_effective}' \
+            "https://github.com/$repository/releases/latest"
+    )" || return 1
+    [[ "$effective_url" == */releases/tag/v* ]] || return 1
+    local release_tag="${effective_url##*/}"
+    [[ "$release_tag" =~ '^v[0-9]+(\.[0-9]+){1,2}$' ]] || return 1
+    print -r -- "$release_tag"
+}
+
+version_is_newer() {
+    local candidate="$1"
+    local installed="$2"
+    local -a candidate_parts installed_parts
+    candidate_parts=("${(@s:.:)candidate}")
+    installed_parts=("${(@s:.:)installed}")
+
+    local index candidate_part installed_part
+    for index in 1 2 3; do
+        candidate_part="${candidate_parts[$index]:-0}"
+        installed_part="${installed_parts[$index]:-0}"
+        if (( candidate_part > installed_part )); then
+            return 0
+        fi
+        if (( candidate_part < installed_part )); then
+            return 1
+        fi
+    done
+    return 1
 }
 
 install_application() {
@@ -107,25 +212,39 @@ install_application() {
     fi
 
     open "$destination_app"
-    echo "TorranceKit 已安装到：$destination_app"
+    local installed_version="$(plutil -extract CFBundleShortVersionString raw "$destination_app/Contents/Info.plist")"
+    echo "TorranceKit $installed_version 已安装到：$destination_app"
 }
 
 install_release() {
     local release_tag
     if [[ "$requested_version" == "latest" ]]; then
-        local release_metadata="$temporary_directory/release.json"
-        curl --fail --silent --location --retry 2 \
-            --connect-timeout 15 \
-            --output "$release_metadata" \
-            "https://api.github.com/repos/$repository/releases/latest" \
-            || return 1
-        release_tag="$(plutil -extract tag_name raw -o - "$release_metadata" 2>/dev/null)"
-        [[ -n "$release_tag" ]] || return 1
+        release_tag="$(resolve_latest_release_tag)" || return 1
     else
         release_tag="v${requested_version#v}"
     fi
 
     local version="${release_tag#v}"
+    if [[ "$update_only" == true ]]; then
+        if version_is_newer "$version" "$current_version"; then
+            if [[ "$check_only" == true ]]; then
+                echo "发现新版本：$current_version → $version"
+                return 0
+            fi
+            echo "发现新版本：$current_version → $version"
+        elif [[ "$version" == "$current_version" ]]; then
+            if [[ "$force_reinstall" == true ]]; then
+                echo "正在重新安装 TorranceKit $version…"
+            else
+                echo "TorranceKit $current_version 已是最新版本。"
+                return 0
+            fi
+        else
+            echo "当前版本 $current_version 比最新正式版本 $version 更新，无需处理。"
+            return 0
+        fi
+    fi
+
     local archive_name="TorranceKit-$version-macOS-arm64.zip"
     local release_base_url="https://github.com/$repository/releases/download/$release_tag"
     local archive="$temporary_directory/$archive_name"
@@ -176,6 +295,10 @@ if [[ "$force_source" == false ]]; then
     fi
     if [[ "$requested_version" != "latest" ]]; then
         echo "未找到 TorranceKit ${requested_version#v} 的 Release 安装包。" >&2
+        exit 1
+    fi
+    if [[ "$update_only" == true ]]; then
+        echo "无法获取最新 TorranceKit Release，请稍后重试。" >&2
         exit 1
     fi
 fi

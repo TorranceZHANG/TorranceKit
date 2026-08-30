@@ -10,19 +10,7 @@ final class AppSettingsTests: XCTestCase {
     XCTAssertNil(settings.maxItems)
     XCTAssertEqual(settings.retentionDays, 7)
     XCTAssertEqual(settings.hotKey, .default)
-    XCTAssertTrue(settings.showDockIcon)
     XCTAssertEqual(settings.maxTextBytes, AppSettings.default.maxTextBytes)
-  }
-
-  func testDockIconSettingRoundTripsThroughJSON() throws {
-    var settings = AppSettings.default
-    settings.showDockIcon = false
-
-    let data = try JSONEncoder().encode(settings)
-    let restored = try JSONDecoder().decode(AppSettings.self, from: data)
-
-    XCTAssertFalse(restored.showDockIcon)
-    XCTAssertEqual(restored, settings)
   }
 
   func testHotKeyIsNormalized() throws {

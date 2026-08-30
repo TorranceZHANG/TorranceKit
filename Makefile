@@ -1,4 +1,4 @@
-.PHONY: test build install install-system package clean
+.PHONY: test build install install-system update check-update package clean
 
 test:
 	./scripts/test.sh
@@ -11,6 +11,12 @@ install:
 
 install-system:
 	./scripts/install.sh --system
+
+update:
+	./update.sh
+
+check-update:
+	./update.sh --check
 
 package:
 	./scripts/package_release.sh

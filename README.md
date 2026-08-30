@@ -2,7 +2,7 @@
 
 TorranceKit 是一款面向 Apple Silicon Mac 的开源原生效率工具库。它以菜单栏应用为统一入口，便于持续增加新的本地工具模块。当前第一个模块是剪贴板历史：记录用户连续复制的文本，通过可配置的全局快捷键呼出类似 Alfred 的浮动选择器，然后搜索、选择并粘贴任意一条历史内容。
 
-项目完全使用 SwiftUI / AppKit 实现，无第三方运行时依赖、无网络请求、无遥测，用户数据只保存在本机。
+项目完全使用 SwiftUI / AppKit 实现，无第三方运行时依赖。App 运行时无网络请求、无遥测，用户数据只保存在本机；安装和更新脚本仅在用户主动执行时访问 GitHub。
 
 ## 当前模块：剪贴板历史
 
@@ -11,7 +11,7 @@ TorranceKit 是一款面向 Apple Silicon Mac 的开源原生效率工具库。�
 - 输入即搜索，支持 `↑` / `↓`、回车、`⌘1…9` 和鼠标操作
 - 获得辅助功能权限后，选中即粘贴；未授权时安全降级为“选中即复制”
 - 常驻菜单栏，可暂停记录、清空历史和退出
-- 默认同时显示程序坞图标，刘海或菜单栏空间不足时仍有稳定入口，并可在设置中关闭
+- 不占用程序坞；从“应用程序”中再次打开 App 可直接呼出剪贴板
 - 保留条数、保留时间、单条大小、监听频率和粘贴行为均可配置
 - 可按 Bundle ID 跳过前台应用中的复制内容
 - 跳过密码管理器常用的临时、机密剪贴板类型
@@ -40,6 +40,24 @@ curl -fsSL https://raw.githubusercontent.com/TorranceZHANG/TorranceKit/main/inst
 curl -fSLO https://raw.githubusercontent.com/TorranceZHANG/TorranceKit/main/install.sh
 zsh install.sh
 ```
+
+## 更新
+
+检查并安装最新正式版本，无需 clone：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/TorranceZHANG/TorranceKit/main/update.sh | zsh
+```
+
+只检查、不安装：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/TorranceZHANG/TorranceKit/main/update.sh | zsh -s -- --check
+```
+
+更新脚本会自动查找 `~/Applications` 或 `/Applications` 中已安装的 TorranceKit，比较语义化版本号，只下载更新的 GitHub Release，并继续校验 SHA-256、Bundle ID、arm64 架构和代码签名。相同版本不会重复安装；需要修复安装时可追加 `--force`。更新只使用正式 Release，不会退回到 `main` 源码构建。
+
+如果两个位置都安装了 TorranceKit，默认更新用户目录中的版本；追加 `--system` 可明确更新 `/Applications` 中的版本。
 
 ### 从源码一键安装
 
@@ -84,9 +102,13 @@ CODE_SIGN_IDENTITY="Developer ID Application: Your Name (TEAMID)" ./scripts/buil
 
 ### 菜单栏图标被刘海挡住时
 
-macOS 会在菜单栏空间不足时隐藏部分状态项，应用本身无法强制占据最右侧位置。TorranceKit 默认同时提供程序坞图标；点击它可以重新打开剪贴板，选择内容后仍会返回最近使用的应用继续粘贴。也可以直接使用全局快捷键，它不依赖菜单栏图标是否可见。
+macOS 会在菜单栏空间不足时隐藏部分状态项，应用本身无法强制占据最右侧位置。TorranceKit 不常驻程序坞，可以直接在“应用程序”中再次打开 `TorranceKit.app`，或者执行下面的命令呼出剪贴板：
 
-在“设置 → 高级 → 应用入口”中可以关闭程序坞图标。菜单栏图标当前可见时，也可以按住 `⌘` 将它向右拖动，降低被刘海或其他状态项挤出的概率。
+```bash
+open "$HOME/Applications/TorranceKit.app"
+```
+
+剪贴板浮层底部保留“设置”入口，也可以按 `⌘,` 打开设置。全局快捷键不依赖菜单栏图标是否可见；菜单栏图标当前可见时，还可以按住 `⌘` 将它向右拖动，降低被刘海或其他状态项挤出的概率。
 
 ## 本地数据
 
@@ -97,7 +119,7 @@ macOS 会在菜单栏空间不足时隐藏部分状态项，应用本身无法�
 ~/Library/Application Support/TorranceKit/Clipboard/history.json
 ```
 
-TorranceKit 不联网、不上传内容。暂停记录期间产生的剪贴板内容不会在恢复时补录。
+TorranceKit App 运行时不联网、不上传内容。暂停记录期间产生的剪贴板内容不会在恢复时补录。
 
 ### 从 PasteNook 升级
 
@@ -136,8 +158,7 @@ TorranceKit 不联网、不上传内容。暂停记录期间产生的剪贴板�
   "maxTextBytes": 1048576,
   "pasteDelayMilliseconds": 160,
   "pollIntervalMilliseconds": 450,
-  "retentionDays": 30,
-  "showDockIcon": true
+  "retentionDays": 30
 }
 ```
 
@@ -155,7 +176,6 @@ TorranceKit 不联网、不上传内容。暂停记录期间产生的剪贴板�
 | `autoPaste` | 布尔值 | 是否在选择后自动向原应用发送 `⌘V` |
 | `pasteDelayMilliseconds` | `50...2000` | 恢复原应用后等待多久再粘贴 |
 | `excludedBundleIdentifiers` | 字符串数组 | 当前台应用匹配时跳过记录，例如 `com.example.SecretApp` |
-| `showDockIcon` | 布尔值 | 是否显示程序坞图标；刘海屏或菜单栏项目较多时建议开启 |
 
 `maxItems` 和 `retentionDays` 同时设置时，两项约束同时生效。两项都设为 `null` 会永久累计历史，请结合磁盘和隐私风险谨慎使用。
 

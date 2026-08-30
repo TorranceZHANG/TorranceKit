@@ -6,6 +6,7 @@ final class PickerPanelController: NSObject, NSWindowDelegate {
   private let history: ClipboardHistory
   private let state = PickerState()
   private let onSelect: (ClipboardItem, NSRunningApplication?) -> Void
+  private let onOpenSettings: () -> Void
   private var panel: PickerPanel!
   private var keyboardMonitor: Any?
   private var targetApplication: NSRunningApplication?
@@ -16,15 +17,17 @@ final class PickerPanelController: NSObject, NSWindowDelegate {
     history: ClipboardHistory,
     permission: AccessibilityPermission,
     configuration: AppConfiguration,
+    onOpenSettings: @escaping () -> Void,
     onSelect: @escaping (ClipboardItem, NSRunningApplication?) -> Void
   ) {
     self.history = history
+    self.onOpenSettings = onOpenSettings
     self.onSelect = onSelect
     super.init()
 
     let panel = PickerPanel(
       contentRect: NSRect(x: 0, y: 0, width: 680, height: 500),
-      styleMask: [.borderless, .fullSizeContentView],
+      styleMask: [.borderless, .fullSizeContentView, .nonactivatingPanel],
       backing: .buffered,
       defer: false
     )
@@ -43,6 +46,7 @@ final class PickerPanelController: NSObject, NSWindowDelegate {
       state: state,
       onSelect: { [weak self] item in self?.choose(item) },
       onDelete: { item in history.remove(item) },
+      onOpenSettings: { [weak self] in self?.openSettings() },
       onClose: { [weak self] in self?.hide() }
     )
     let hostingView = NSHostingView(rootView: view)
@@ -81,7 +85,8 @@ final class PickerPanelController: NSObject, NSWindowDelegate {
 
   func show() {
     if panel.isVisible {
-      panel.makeKeyAndOrderFront(nil)
+      panel.orderFrontRegardless()
+      panel.makeKey()
       return
     }
 
@@ -98,8 +103,8 @@ final class PickerPanelController: NSObject, NSWindowDelegate {
     state.reset()
     positionPanel()
     installKeyboardMonitor()
-    NSApp.activate(ignoringOtherApps: true)
-    panel.makeKeyAndOrderFront(nil)
+    panel.orderFrontRegardless()
+    panel.makeKey()
   }
 
   func toggle() {
@@ -119,6 +124,11 @@ final class PickerPanelController: NSObject, NSWindowDelegate {
     let target = targetApplication
     hide()
     onSelect(item, target)
+  }
+
+  private func openSettings() {
+    hide()
+    onOpenSettings()
   }
 
   private func rememberExternalApplication(_ application: NSRunningApplication?) {
@@ -187,6 +197,10 @@ final class PickerPanelController: NSObject, NSWindowDelegate {
     }
 
     let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+    if modifiers.contains(.command), event.keyCode == 43 {  // Command + comma
+      openSettings()
+      return true
+    }
     guard modifiers.contains(.command),
       let index = Self.numberKeyIndex[event.keyCode],
       items.indices.contains(index)

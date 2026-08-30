@@ -17,7 +17,13 @@ struct TorranceKitApp: App {
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
   func applicationDidFinishLaunching(_ notification: Notification) {
+    NSApp.setActivationPolicy(.accessory)
     AppModel.shared.start()
+    // Let the menu-bar scene finish launching before making the accessory panel key.
+    // Showing it in the same run-loop turn can make macOS immediately resign and hide it.
+    DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+      AppModel.shared.showPicker()
+    }
   }
 
   func applicationShouldHandleReopen(
@@ -54,14 +60,6 @@ private struct TorranceKitMenuView: View {
     Divider()
 
     Toggle("记录剪贴板", isOn: $model.isCaptureEnabled)
-
-    Toggle(
-      "在程序坞显示图标",
-      isOn: Binding(
-        get: { configuration.settings.showDockIcon },
-        set: { model.setDockIconVisible($0) }
-      )
-    )
 
     if configuration.settings.autoPaste && !permission.isTrusted {
       Button("开启自动粘贴权限…") {

@@ -4,6 +4,7 @@ set -euo pipefail
 
 project_dir="${0:A:h:h}"
 
+"$project_dir/scripts/test_installer.sh"
 "$project_dir/scripts/test_core.sh"
 
 cd "$project_dir"

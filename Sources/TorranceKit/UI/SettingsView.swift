@@ -11,7 +11,6 @@ struct SettingsDraft: Equatable {
   var usesShift: Bool
   var doubleTapModifier: String
   var doubleTapIntervalMilliseconds: Int
-  var showDockIcon: Bool
 
   var limitsItemCount: Bool
   var maxItems: Int
@@ -33,7 +32,6 @@ struct SettingsDraft: Equatable {
     usesShift = settings.hotKey.modifiers.contains("shift")
     doubleTapModifier = settings.hotKey.doubleTapModifier
     doubleTapIntervalMilliseconds = settings.hotKey.doubleTapIntervalMilliseconds
-    showDockIcon = settings.showDockIcon
     limitsItemCount = settings.maxItems != nil
     maxItems = settings.maxItems ?? AppSettings.default.maxItems ?? 1_000
     limitsRetentionTime = settings.retentionDays != nil
@@ -68,7 +66,6 @@ struct SettingsDraft: Equatable {
         doubleTapModifier: doubleTapModifier,
         doubleTapIntervalMilliseconds: doubleTapIntervalMilliseconds
       ),
-      showDockIcon: showDockIcon,
       maxTextBytes: maxTextBytes,
       pollIntervalMilliseconds: pollIntervalMilliseconds,
       autoPaste: autoPaste,
@@ -477,20 +474,6 @@ private struct AdvancedSettingsView: View {
   var body: some View {
     ScrollView {
       VStack(alignment: .leading, spacing: 18) {
-        GroupBox {
-          VStack(alignment: .leading, spacing: 10) {
-            Toggle("在程序坞显示 TorranceKit 图标", isOn: $model.draft.showDockIcon)
-
-            Text("刘海屏或菜单栏图标较多时，macOS 可能把状态项移出可见区域。开启后可从程序坞再次打开剪贴板；全局快捷键始终可用。")
-              .font(.caption)
-              .foregroundStyle(.secondary)
-          }
-          .frame(maxWidth: .infinity, alignment: .leading)
-        } label: {
-          Label("应用入口", systemImage: "dock.rectangle")
-            .font(.headline)
-        }
-
         GroupBox {
           VStack(alignment: .leading, spacing: 12) {
             Text("可视化设置与 JSON 使用同一份配置。通常不需要直接编辑文件；高级用户可用它做版本管理或批量修改。")

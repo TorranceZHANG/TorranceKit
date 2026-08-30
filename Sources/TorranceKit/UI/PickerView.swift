@@ -8,6 +8,7 @@ struct PickerView: View {
 
   let onSelect: (ClipboardItem) -> Void
   let onDelete: (ClipboardItem) -> Void
+  let onOpenSettings: () -> Void
   let onClose: () -> Void
 
   @FocusState private var searchIsFocused: Bool
@@ -179,6 +180,13 @@ struct PickerView: View {
         )
         KeyHint(keys: "⌘1…9", action: "快选")
         Spacer()
+        Button(action: onOpenSettings) {
+          Label("设置", systemImage: "gearshape")
+            .font(.system(size: 11))
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(.secondary)
+        .help("打开设置（⌘,）")
         Text("esc 关闭")
           .font(.system(size: 11))
           .foregroundStyle(.tertiary)
