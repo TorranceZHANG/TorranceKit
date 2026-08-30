@@ -1,18 +1,19 @@
 # TorranceKit
 
-TorranceKit 是一款面向 Apple Silicon Mac 的开源原生效率工具库。它以菜单栏应用为统一入口，便于持续增加新的本地工具模块。当前第一个模块是剪贴板历史：记录用户连续复制的文本，通过可配置的全局快捷键呼出类似 Alfred 的浮动选择器，然后搜索、选择并粘贴任意一条历史内容。
+TorranceKit 是一款面向 Apple Silicon Mac 的开源原生效率工具库。它以菜单栏应用为统一入口，便于持续增加新的本地工具模块。当前第一个模块是剪贴板历史：记录用户连续复制的文本和图片，通过可配置的全局快捷键呼出类似 Alfred 的双栏选择器，然后搜索、预览、选择并粘贴任意一条历史内容。
 
 项目完全使用 SwiftUI / AppKit 实现，无第三方运行时依赖。App 运行时无网络请求、无遥测，用户数据只保存在本机；安装和更新脚本仅在用户主动执行时访问 GitHub。
 
 ## 当前模块：剪贴板历史
 
 - 默认 `⌥V` 呼出，可切换为其他组合快捷键或“双击 Ctrl / Option / Command / Shift”
-- 自动记录纯文本，重复内容去重并移动到顶部
-- 输入即搜索，支持 `↑` / `↓`、回车、`⌘1…9` 和鼠标操作
-- 获得辅助功能权限后，选中即粘贴；未授权时安全降级为“选中即复制”
+- 自动记录文本和图片，重复内容去重并移动到顶部
+- 左侧显示省略后的内容列表，右侧完整预览长文本或图片
+- 输入即搜索，支持 `↑` / `↓`、回车、双击、`⌘1…9` 和鼠标操作
+- 获得辅助功能权限后，确认条目即粘贴；未授权时安全降级为“确认即复制”
 - 常驻菜单栏，可暂停记录、清空历史和退出
 - 不占用程序坞；从“应用程序”中再次打开 App 可直接呼出剪贴板
-- 保留条数、保留时间、单条大小、监听频率和粘贴行为均可配置
+- 保留条数、保留时间、文本/图片大小、监听频率和粘贴行为均可配置
 - 可按 Bundle ID 跳过前台应用中的复制内容
 - 跳过密码管理器常用的临时、机密剪贴板类型
 
@@ -96,9 +97,10 @@ CODE_SIGN_IDENTITY="Developer ID Application: Your Name (TEAMID)" ./scripts/buil
 
 ## 使用方式
 
-1. 正常使用 `⌘C` 复制多段文字（终端中任何能写入系统剪贴板的 `Ctrl+C` 映射同样支持）。
+1. 正常使用 `⌘C` 复制多段文字或图片（终端中任何能写入系统剪贴板的 `Ctrl+C` 映射同样支持）。
 2. 在要输入文字的位置按 `⌥V`。
-3. 输入关键词过滤，使用方向键选择后按回车，或直接按 `⌘1…9`。
+3. 左侧单击条目，右侧查看完整文本或图片预览。
+4. 按回车、双击条目，或直接按 `⌘1…9` 完成复制/粘贴。
 
 列表支持触控板和鼠标滚轮自然滚动。滚动时鼠标经过条目只更新悬停高亮，不会把页面自动拉回；使用 `↑` / `↓` 键选择时才会自动滚动到选中项。
 
@@ -119,7 +121,10 @@ open "$HOME/Applications/TorranceKit.app"
 ```text
 ~/Library/Application Support/TorranceKit/config.json
 ~/Library/Application Support/TorranceKit/Clipboard/history.json
+~/Library/Application Support/TorranceKit/Clipboard/images/*.png
 ```
+
+文本和图片元数据保存在 `history.json`，图片二进制单独保存为私有 PNG 文件。删除、过期淘汰或清空图片记录时，对应文件也会同步删除。
 
 TorranceKit App 运行时不联网、不上传内容。暂停记录期间产生的剪贴板内容不会在恢复时补录。
 
@@ -136,7 +141,7 @@ TorranceKit App 运行时不联网、不上传内容。暂停记录期间产生�
 - 全局呼出快捷键及修饰键组合
 - 双击 Ctrl、Option、Command 或 Shift 呼出，以及双击识别间隔
 - 历史保留条数和保留时间，两者均可单独关闭限制
-- 自动粘贴、粘贴延迟、监听间隔和单条文本上限
+- 是否记录图片、自动粘贴、粘贴延迟、监听间隔和文本/图片大小上限
 - 不记录剪贴板的排除应用 Bundle ID
 
 点击“保存并应用”后无需重启。如果新快捷键被其他应用占用或数值越界，窗口会显示错误，原有运行配置保持不变。
@@ -148,6 +153,7 @@ TorranceKit App 运行时不联网、不上传内容。暂停记录期间产生�
 ```json
 {
   "autoPaste": true,
+  "capturesImages": true,
   "excludedBundleIdentifiers": [],
   "hotKey": {
     "doubleTapIntervalMilliseconds": 400,
@@ -156,6 +162,7 @@ TorranceKit App 运行时不联网、不上传内容。暂停记录期间产生�
     "mode": "keyCombination",
     "modifiers": ["option"]
   },
+  "maxImageBytes": 20971520,
   "maxItems": 1000,
   "maxTextBytes": 1048576,
   "pasteDelayMilliseconds": 160,
@@ -173,13 +180,15 @@ TorranceKit App 运行时不联网、不上传内容。暂停记录期间产生�
 | `hotKey.doubleTapIntervalMilliseconds` | `200...800` | 两次按下之间允许的最长毫秒数 |
 | `maxItems` | 正整数或 `null` | 最大历史条数；`null` 表示不限条数 |
 | `retentionDays` | 正整数或 `null` | 最近复制或使用后保留天数；`null` 表示不限时间 |
+| `capturesImages` | 布尔值 | 是否记录系统剪贴板中的图片 |
 | `maxTextBytes` | `1024...10485760` | 单条文本最大 UTF-8 字节数 |
+| `maxImageBytes` | `65536...52428800` | 单张图片转为 PNG 后允许保存的最大字节数 |
 | `pollIntervalMilliseconds` | `100...5000` | 检查剪贴板变化的间隔 |
 | `autoPaste` | 布尔值 | 是否在选择后自动向原应用发送 `⌘V` |
 | `pasteDelayMilliseconds` | `50...2000` | 恢复原应用后等待多久再粘贴 |
 | `excludedBundleIdentifiers` | 字符串数组 | 当前台应用匹配时跳过记录，例如 `com.example.SecretApp` |
 
-`maxItems` 和 `retentionDays` 同时设置时，两项约束同时生效。两项都设为 `null` 会永久累计历史，请结合磁盘和隐私风险谨慎使用。
+`maxItems` 和 `retentionDays` 对文本、图片统一计数；同时设置时两项约束同时生效。两项都设为 `null` 会永久累计历史，请结合磁盘和隐私风险谨慎使用。
 
 组合快捷键示例：
 
@@ -236,8 +245,8 @@ make build
 
 当前剪贴板模块的核心分层如下：
 
-- `ClipboardMonitor`：监听系统剪贴板变化并过滤敏感类型
-- `ClipboardHistory`：去重、限量、持久化
+- `ClipboardMonitor`：监听系统剪贴板变化，过滤敏感类型并将图片规范化为 PNG
+- `ClipboardHistory`：统一管理文本/图片去重、限量、元数据与图片文件持久化
 - `AppConfiguration`：解析、补默认值并校验 `config.json`
 - `GlobalHotKey`：注册和热切换组合快捷键或双击修饰键触发器
 - `PickerPanelController`：管理 Alfred 风格浮层与键盘路由

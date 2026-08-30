@@ -4,14 +4,13 @@ import ApplicationServices
 @MainActor
 enum PasteController {
   static func copyAndPaste(
-    text: String,
+    payload: ClipboardPayload,
     into targetApplication: NSRunningApplication?,
     automatically: Bool,
     delayMilliseconds: Int
   ) {
     let pasteboard = NSPasteboard.general
-    pasteboard.clearContents()
-    pasteboard.setString(text, forType: .string)
+    write(payload, to: pasteboard)
 
     targetApplication?.activate(options: [.activateAllWindows, .activateIgnoringOtherApps])
     guard automatically else { return }
@@ -36,6 +35,21 @@ enum PasteController {
       keyUp.flags = .maskCommand
       keyDown.post(tap: .cghidEventTap)
       keyUp.post(tap: .cghidEventTap)
+    }
+  }
+
+  @discardableResult
+  static func write(_ payload: ClipboardPayload, to pasteboard: NSPasteboard) -> Bool {
+    pasteboard.clearContents()
+    switch payload {
+    case .text(let text):
+      return pasteboard.setString(text, forType: .string)
+    case .image(let pngData):
+      let wrotePNG = pasteboard.setData(pngData, forType: .png)
+      if let tiffData = NSImage(data: pngData)?.tiffRepresentation {
+        pasteboard.setData(tiffData, forType: .tiff)
+      }
+      return wrotePNG
     }
   }
 }

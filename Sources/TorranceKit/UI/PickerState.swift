@@ -22,8 +22,16 @@ final class PickerState: ObservableObject {
     let needle = query.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !needle.isEmpty else { return items }
     return items.filter { item in
-      item.text.localizedCaseInsensitiveContains(needle)
+      item.searchableText.localizedCaseInsensitiveContains(needle)
     }
+  }
+
+  func select(index: Int, itemCount: Int) {
+    guard itemCount > 0 else {
+      selectedIndex = 0
+      return
+    }
+    selectedIndex = min(max(index, 0), itemCount - 1)
   }
 
   func moveSelection(by delta: Int, itemCount: Int) {

@@ -17,10 +17,12 @@ struct SettingsDraft: Equatable {
   var limitsRetentionTime: Bool
   var retentionDays: Int
 
+  var capturesImages: Bool
   var autoPaste: Bool
   var pasteDelayMilliseconds: Int
   var pollIntervalMilliseconds: Int
   var maxTextBytes: Int
+  var maxImageBytes: Int
   var excludedBundleIdentifiersText: String
 
   init(settings: AppSettings) {
@@ -36,10 +38,12 @@ struct SettingsDraft: Equatable {
     maxItems = settings.maxItems ?? AppSettings.default.maxItems ?? 1_000
     limitsRetentionTime = settings.retentionDays != nil
     retentionDays = settings.retentionDays ?? AppSettings.default.retentionDays ?? 30
+    capturesImages = settings.capturesImages
     autoPaste = settings.autoPaste
     pasteDelayMilliseconds = settings.pasteDelayMilliseconds
     pollIntervalMilliseconds = settings.pollIntervalMilliseconds
     maxTextBytes = settings.maxTextBytes
+    maxImageBytes = settings.maxImageBytes
     excludedBundleIdentifiersText = settings.excludedBundleIdentifiers.joined(separator: "\n")
   }
 
@@ -66,7 +70,9 @@ struct SettingsDraft: Equatable {
         doubleTapModifier: doubleTapModifier,
         doubleTapIntervalMilliseconds: doubleTapIntervalMilliseconds
       ),
+      capturesImages: capturesImages,
       maxTextBytes: maxTextBytes,
+      maxImageBytes: maxImageBytes,
       pollIntervalMilliseconds: pollIntervalMilliseconds,
       autoPaste: autoPaste,
       pasteDelayMilliseconds: pasteDelayMilliseconds,
@@ -370,6 +376,8 @@ private struct ClipboardSettingsView: View {
 
         GroupBox {
           VStack(alignment: .leading, spacing: 14) {
+            Toggle("记录图片", isOn: $model.draft.capturesImages)
+
             Toggle("选择历史后自动粘贴", isOn: $model.draft.autoPaste)
 
             HStack {
@@ -396,6 +404,19 @@ private struct ClipboardSettingsView: View {
               .labelsHidden()
               .frame(width: 150)
             }
+
+            HStack {
+              Text("单张图片上限")
+              Spacer()
+              Picker("", selection: $model.draft.maxImageBytes) {
+                ForEach(imageSizeChoices, id: \.self) { byteCount in
+                  Text(byteCountDescription(byteCount)).tag(byteCount)
+                }
+              }
+              .labelsHidden()
+              .frame(width: 150)
+            }
+            .disabled(!model.draft.capturesImages)
           }
           .frame(maxWidth: .infinity, alignment: .leading)
         } label: {
@@ -449,6 +470,12 @@ private struct ClipboardSettingsView: View {
     let presets = [65_536, 262_144, 1_048_576, 5_242_880, 10_485_760]
     guard !presets.contains(model.draft.maxTextBytes) else { return presets }
     return (presets + [model.draft.maxTextBytes]).sorted()
+  }
+
+  private var imageSizeChoices: [Int] {
+    let presets = [5_242_880, 10_485_760, 20_971_520, 52_428_800]
+    guard !presets.contains(model.draft.maxImageBytes) else { return presets }
+    return (presets + [model.draft.maxImageBytes]).sorted()
   }
 
   private var doubleTapIntervalChoices: [Int] {

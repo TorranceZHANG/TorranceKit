@@ -102,7 +102,7 @@ final class AppModel: ObservableObject {
   func confirmAndClearHistory() {
     let alert = NSAlert()
     alert.messageText = "清空剪贴板历史？"
-    alert.informativeText = "这会永久删除保存在本机的全部文本记录。"
+    alert.informativeText = "这会永久删除保存在本机的全部文本和图片记录。"
     alert.alertStyle = .warning
     alert.addButton(withTitle: "清空")
     alert.addButton(withTitle: "取消")
@@ -175,11 +175,20 @@ final class AppModel: ObservableObject {
     _ item: ClipboardItem,
     targetApplication: NSRunningApplication?
   ) {
+    guard let payload = history.payload(for: item) else {
+      history.remove(item)
+      showAlert(
+        title: "无法读取剪贴板内容",
+        message: "对应的本地图片文件可能已被删除，这条历史记录已清理。",
+        style: .warning
+      )
+      return
+    }
     history.markUsed(item)
     permission.refresh()
-    monitor.ignoreNextChange(containing: item.text)
+    monitor.ignoreNextChange(containing: payload)
     PasteController.copyAndPaste(
-      text: item.text,
+      payload: payload,
       into: targetApplication,
       automatically: permission.isTrusted && configuration.settings.autoPaste,
       delayMilliseconds: configuration.settings.pasteDelayMilliseconds

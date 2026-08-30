@@ -143,7 +143,9 @@ struct AppSettings: Codable, Equatable {
   var maxItems: Int?
   var retentionDays: Int?
   var hotKey: HotKeyConfiguration
+  var capturesImages: Bool
   var maxTextBytes: Int
+  var maxImageBytes: Int
   var pollIntervalMilliseconds: Int
   var autoPaste: Bool
   var pasteDelayMilliseconds: Int
@@ -153,7 +155,9 @@ struct AppSettings: Codable, Equatable {
     maxItems: 1_000,
     retentionDays: 30,
     hotKey: .default,
+    capturesImages: true,
     maxTextBytes: 1_048_576,
+    maxImageBytes: 20_971_520,
     pollIntervalMilliseconds: 450,
     autoPaste: true,
     pasteDelayMilliseconds: 160,
@@ -170,6 +174,11 @@ struct AppSettings: Codable, Equatable {
     guard (1_024...10_485_760).contains(maxTextBytes) else {
       throw ConfigurationError.invalidValue(
         "maxTextBytes 必须在 1024 到 10485760 之间"
+      )
+    }
+    guard (65_536...52_428_800).contains(maxImageBytes) else {
+      throw ConfigurationError.invalidValue(
+        "maxImageBytes 必须在 65536 到 52428800 之间"
       )
     }
     guard (100...5_000).contains(pollIntervalMilliseconds) else {
@@ -195,7 +204,7 @@ struct AppSettings: Codable, Equatable {
   }
 
   private enum CodingKeys: String, CodingKey {
-    case maxItems, retentionDays, hotKey, maxTextBytes
+    case maxItems, retentionDays, hotKey, capturesImages, maxTextBytes, maxImageBytes
     case pollIntervalMilliseconds, autoPaste, pasteDelayMilliseconds
     case excludedBundleIdentifiers
   }
@@ -204,7 +213,9 @@ struct AppSettings: Codable, Equatable {
     maxItems: Int?,
     retentionDays: Int?,
     hotKey: HotKeyConfiguration,
+    capturesImages: Bool,
     maxTextBytes: Int,
+    maxImageBytes: Int,
     pollIntervalMilliseconds: Int,
     autoPaste: Bool,
     pasteDelayMilliseconds: Int,
@@ -213,7 +224,9 @@ struct AppSettings: Codable, Equatable {
     self.maxItems = maxItems
     self.retentionDays = retentionDays
     self.hotKey = hotKey
+    self.capturesImages = capturesImages
     self.maxTextBytes = maxTextBytes
+    self.maxImageBytes = maxImageBytes
     self.pollIntervalMilliseconds = pollIntervalMilliseconds
     self.autoPaste = autoPaste
     self.pasteDelayMilliseconds = pasteDelayMilliseconds
@@ -234,9 +247,15 @@ struct AppSettings: Codable, Equatable {
     hotKey =
       try container.decodeIfPresent(HotKeyConfiguration.self, forKey: .hotKey)
       ?? defaults.hotKey
+    capturesImages =
+      try container.decodeIfPresent(Bool.self, forKey: .capturesImages)
+      ?? defaults.capturesImages
     maxTextBytes =
       try container.decodeIfPresent(Int.self, forKey: .maxTextBytes)
       ?? defaults.maxTextBytes
+    maxImageBytes =
+      try container.decodeIfPresent(Int.self, forKey: .maxImageBytes)
+      ?? defaults.maxImageBytes
     pollIntervalMilliseconds =
       try container.decodeIfPresent(
         Int.self,
@@ -270,7 +289,9 @@ struct AppSettings: Codable, Equatable {
       try container.encodeNil(forKey: .retentionDays)
     }
     try container.encode(hotKey, forKey: .hotKey)
+    try container.encode(capturesImages, forKey: .capturesImages)
     try container.encode(maxTextBytes, forKey: .maxTextBytes)
+    try container.encode(maxImageBytes, forKey: .maxImageBytes)
     try container.encode(pollIntervalMilliseconds, forKey: .pollIntervalMilliseconds)
     try container.encode(autoPaste, forKey: .autoPaste)
     try container.encode(pasteDelayMilliseconds, forKey: .pasteDelayMilliseconds)

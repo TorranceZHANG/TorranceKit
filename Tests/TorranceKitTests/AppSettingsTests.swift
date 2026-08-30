@@ -10,7 +10,9 @@ final class AppSettingsTests: XCTestCase {
     XCTAssertNil(settings.maxItems)
     XCTAssertEqual(settings.retentionDays, 7)
     XCTAssertEqual(settings.hotKey, .default)
+    XCTAssertTrue(settings.capturesImages)
     XCTAssertEqual(settings.maxTextBytes, AppSettings.default.maxTextBytes)
+    XCTAssertEqual(settings.maxImageBytes, AppSettings.default.maxImageBytes)
   }
 
   func testHotKeyIsNormalized() throws {
@@ -72,6 +74,12 @@ final class AppSettingsTests: XCTestCase {
   func testRejectsPollingIntervalBelowMinimum() {
     var settings = AppSettings.default
     settings.pollIntervalMilliseconds = 50
+    XCTAssertThrowsError(try settings.validated())
+  }
+
+  func testRejectsImageLimitAboveMaximum() {
+    var settings = AppSettings.default
+    settings.maxImageBytes = 52_428_801
     XCTAssertThrowsError(try settings.validated())
   }
 }

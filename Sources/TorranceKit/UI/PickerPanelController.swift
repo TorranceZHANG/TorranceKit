@@ -26,7 +26,7 @@ final class PickerPanelController: NSObject, NSWindowDelegate {
     super.init()
 
     let panel = PickerPanel(
-      contentRect: NSRect(x: 0, y: 0, width: 680, height: 500),
+      contentRect: NSRect(x: 0, y: 0, width: 1_000, height: 620),
       styleMask: [.borderless, .fullSizeContentView, .nonactivatingPanel],
       backing: .buffered,
       defer: false

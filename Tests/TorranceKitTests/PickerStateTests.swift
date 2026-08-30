@@ -34,4 +34,18 @@ final class PickerStateTests: XCTestCase {
     XCTAssertEqual(state.selectedIndex, 0)
     XCTAssertEqual(state.selectionScrollRequest, initialRequest + 1)
   }
+
+  func testSearchFindsImageByTypeAndDimensions() {
+    let state = PickerState()
+    let image = ClipboardItem(
+      imageFileName: "image.png",
+      imageDigest: "digest",
+      imagePixelWidth: 1920,
+      imagePixelHeight: 1080,
+      imageByteCount: 1024
+    )
+    state.query = "图片"
+
+    XCTAssertEqual(state.filteredItems(from: [ClipboardItem(text: "hello"), image]), [image])
+  }
 }

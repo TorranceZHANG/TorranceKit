@@ -56,6 +56,25 @@ final class ClipboardHistoryTests: XCTestCase {
     XCTAssertEqual(restored.items.map(\.text), ["persisted"])
   }
 
+  func testLoadsLegacyTextItemWithoutKind() throws {
+    try FileManager.default.createDirectory(
+      at: temporaryDirectory,
+      withIntermediateDirectories: true
+    )
+    let id = UUID()
+    let data = Data(
+      """
+      [{"id":"\(id.uuidString)","text":"legacy","createdAt":"2026-08-30T00:00:00Z","copyCount":1}]
+      """.utf8
+    )
+    try data.write(to: historyURL)
+
+    let history = ClipboardHistory(maxItems: 10, retentionDays: nil, storageURL: historyURL)
+
+    XCTAssertEqual(history.items.first?.kind, .text)
+    XCTAssertEqual(history.items.first?.text, "legacy")
+  }
+
   func testMarkUsedMovesItemToFront() {
     let history = ClipboardHistory(maxItems: 10, retentionDays: nil, storageURL: historyURL)
     history.add(text: "first")

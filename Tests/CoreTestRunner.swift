@@ -14,6 +14,7 @@ enum CoreTestRunner {
     try testUnlimitedRetention(in: directory)
     try testPersistence(in: directory)
     try testPrivateFilePermissions(in: directory)
+    try testImagePersistenceAndCleanup(in: directory)
     try testLegacyDataMigration(in: directory)
     try testConfigurationDefaults()
     try testConfigurationValidation()
@@ -89,6 +90,46 @@ enum CoreTestRunner {
     try expect(permissions?.intValue == 0o600, "private history permissions")
   }
 
+  @MainActor
+  private static func testImagePersistenceAndCleanup(in directory: URL) throws {
+    let url = directory.appendingPathComponent("image-history.json")
+    let imageDirectory = directory.appendingPathComponent("image-files", isDirectory: true)
+    let imageData = Data([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A])
+    let history = ClipboardHistory(
+      maxItems: 10,
+      retentionDays: nil,
+      storageURL: url,
+      imageDirectoryURL: imageDirectory
+    )
+    try expect(
+      history.add(imagePNGData: imageData, pixelWidth: 1, pixelHeight: 1),
+      "image history add"
+    )
+    let item = try unwrap(history.items.first, "image history item")
+    try expect(item.kind == .image, "image history kind")
+    try expect(history.payload(for: item) == .image(pngData: imageData), "image payload")
+    let fileName = try unwrap(item.imageFileName, "image file name")
+    let imageURL = imageDirectory.appendingPathComponent(fileName)
+    let permissions =
+      try FileManager.default.attributesOfItem(
+        atPath: imageURL.path
+      )[.posixPermissions] as? NSNumber
+    try expect(permissions?.intValue == 0o600, "private image permissions")
+
+    let restored = ClipboardHistory(
+      maxItems: 10,
+      retentionDays: nil,
+      storageURL: url,
+      imageDirectoryURL: imageDirectory
+    )
+    try expect(restored.items.first?.kind == .image, "image history persistence")
+    restored.clear()
+    try expect(
+      !FileManager.default.fileExists(atPath: imageURL.path),
+      "image cleanup"
+    )
+  }
+
   private static func testLegacyDataMigration(in directory: URL) throws {
     let legacyDirectory = directory.appendingPathComponent("legacy", isDirectory: true)
     let currentDirectory = directory.appendingPathComponent("current", isDirectory: true)
@@ -142,6 +183,11 @@ enum CoreTestRunner {
     }
   }
 
+  private static func unwrap<T>(_ value: T?, _ name: String) throws -> T {
+    guard let value else { throw CoreTestError.failed(name) }
+    return value
+  }
+
   private static func testConfigurationDefaults() throws {
     let data = Data(#"{"maxItems":null,"retentionDays":7}"#.utf8)
     let settings = try JSONDecoder().decode(AppSettings.self, from: data).validated()
@@ -149,6 +195,11 @@ enum CoreTestRunner {
     try expect(settings.retentionDays == 7, "configured retention days")
     try expect(settings.hotKey == .default, "default hot key")
     try expect(settings.maxTextBytes == AppSettings.default.maxTextBytes, "default max bytes")
+    try expect(settings.capturesImages, "default image capture")
+    try expect(
+      settings.maxImageBytes == AppSettings.default.maxImageBytes,
+      "default image bytes"
+    )
   }
 
   private static func testConfigurationValidation() throws {

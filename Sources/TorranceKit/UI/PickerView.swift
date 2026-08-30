@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 struct PickerView: View {
@@ -17,6 +18,11 @@ struct PickerView: View {
     state.filteredItems(from: history.items)
   }
 
+  private var selectedItem: ClipboardItem? {
+    guard filteredItems.indices.contains(state.selectedIndex) else { return nil }
+    return filteredItems[state.selectedIndex]
+  }
+
   var body: some View {
     ZStack {
       VisualEffectView(material: .hudWindow)
@@ -30,7 +36,7 @@ struct PickerView: View {
         footer
       }
     }
-    .frame(width: 680, height: 500)
+    .frame(width: 1_000, height: 620)
     .preferredColorScheme(.dark)
     .onAppear {
       DispatchQueue.main.async {
@@ -69,7 +75,7 @@ struct PickerView: View {
       HStack(spacing: 10) {
         Image(systemName: "magnifyingglass")
           .foregroundStyle(.secondary)
-        TextField("搜索剪贴板历史", text: $state.query)
+        TextField("搜索文本或图片", text: $state.query)
           .textFieldStyle(.plain)
           .font(.system(size: 15))
           .focused($searchIsFocused)
@@ -96,8 +102,20 @@ struct PickerView: View {
     .padding(.bottom, 14)
   }
 
-  @ViewBuilder
   private var content: some View {
+    HStack(spacing: 0) {
+      historyList
+        .frame(width: 410)
+
+      Divider().opacity(0.32)
+
+      preview
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+  }
+
+  @ViewBuilder
+  private var historyList: some View {
     if filteredItems.isEmpty {
       emptyState
     } else {
@@ -109,11 +127,11 @@ struct PickerView: View {
                 item: item,
                 index: index,
                 isSelected: index == state.selectedIndex,
-                onSelect: { onSelect(item) },
-                onDelete: { onDelete(item) },
-                onHover: {
-                  if $0 { state.selectedIndex = index }
-                }
+                onSelect: {
+                  state.select(index: index, itemCount: filteredItems.count)
+                },
+                onActivate: { onSelect(item) },
+                onDelete: { onDelete(item) }
               )
               .id(item.id)
             }
@@ -138,17 +156,65 @@ struct PickerView: View {
       Image(systemName: state.query.isEmpty ? "clipboard" : "doc.text.magnifyingglass")
         .font(.system(size: 34, weight: .light))
         .foregroundStyle(.tertiary)
-      Text(state.query.isEmpty ? "复制一段文字开始使用" : "没有匹配的内容")
+      Text(state.query.isEmpty ? "复制文本或图片开始使用" : "没有匹配的内容")
         .font(.system(size: 14, weight: .medium))
         .foregroundStyle(.secondary)
       if state.query.isEmpty {
-        Text("剪贴板模块会自动记录之后复制的文本")
+        Text("剪贴板模块会自动记录之后复制的内容")
           .font(.system(size: 12))
           .foregroundStyle(.tertiary)
       }
       Spacer()
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity)
+  }
+
+  @ViewBuilder
+  private var preview: some View {
+    if let selectedItem {
+      VStack(spacing: 0) {
+        HStack(spacing: 10) {
+          Image(systemName: selectedItem.kind == .text ? "doc.text" : "photo")
+            .foregroundStyle(Color.accentColor)
+          VStack(alignment: .leading, spacing: 3) {
+            Text(selectedItem.kind == .text ? "文本预览" : "图片预览")
+              .font(.system(size: 13, weight: .semibold))
+            Text(previewMetadata(for: selectedItem))
+              .font(.system(size: 10.5))
+              .foregroundStyle(.tertiary)
+          }
+          Spacer()
+        }
+        .padding(.horizontal, 18)
+        .frame(height: 54)
+
+        Divider().opacity(0.25)
+
+        switch selectedItem.kind {
+        case .text:
+          ScrollView {
+            Text(selectedItem.text)
+              .font(.system(size: 13.5))
+              .foregroundStyle(.primary)
+              .textSelection(.enabled)
+              .multilineTextAlignment(.leading)
+              .frame(maxWidth: .infinity, alignment: .topLeading)
+              .padding(18)
+          }
+        case .image:
+          ClipboardImagePreview(item: selectedItem, history: history)
+        }
+      }
+    } else {
+      VStack(spacing: 10) {
+        Image(systemName: "rectangle.on.rectangle.slash")
+          .font(.system(size: 30, weight: .light))
+          .foregroundStyle(.tertiary)
+        Text("选择左侧条目查看预览")
+          .font(.system(size: 13))
+          .foregroundStyle(.secondary)
+      }
+    }
   }
 
   private var footer: some View {
@@ -175,7 +241,7 @@ struct PickerView: View {
       HStack(spacing: 15) {
         KeyHint(keys: "↑↓", action: "选择")
         KeyHint(
-          keys: "↩",
+          keys: "↩ / 双击",
           action: permission.isTrusted && configuration.settings.autoPaste
             ? "粘贴" : "复制"
         )
@@ -196,6 +262,17 @@ struct PickerView: View {
       .frame(height: 38)
     }
   }
+
+  private func previewMetadata(for item: ClipboardItem) -> String {
+    let usage = item.copyCount > 1 ? " · 复制 \(item.copyCount) 次" : ""
+    switch item.kind {
+    case .text:
+      return "\(item.text.count) 字符 · \(relativeTime(item.createdAt))\(usage)"
+    case .image:
+      let size = item.imageByteCount.map(formattedByteCount) ?? "未知大小"
+      return "\(item.imageDimensionsText) · \(size) · \(relativeTime(item.createdAt))\(usage)"
+    }
+  }
 }
 
 private struct ClipboardRow: View {
@@ -203,66 +280,107 @@ private struct ClipboardRow: View {
   let index: Int
   let isSelected: Bool
   let onSelect: () -> Void
+  let onActivate: () -> Void
   let onDelete: () -> Void
-  let onHover: (Bool) -> Void
+
+  @State private var isHovered = false
 
   var body: some View {
-    HStack(spacing: 12) {
+    HStack(spacing: 10) {
       ZStack {
         RoundedRectangle(cornerRadius: 7)
           .fill(isSelected ? Color.accentColor.opacity(0.22) : Color.white.opacity(0.055))
-        Text(index < 9 ? "⌘\(index + 1)" : "\(index + 1)")
-          .font(.system(size: 10, weight: .semibold, design: .rounded))
-          .foregroundStyle(isSelected ? Color.accentColor : .secondary)
+        if index < 9 {
+          Text("⌘\(index + 1)")
+            .font(.system(size: 10, weight: .semibold, design: .rounded))
+        } else {
+          Image(systemName: item.kind == .text ? "doc.text" : "photo")
+            .font(.system(size: 11, weight: .medium))
+        }
       }
-      .frame(width: 38, height: 32)
+      .foregroundStyle(isSelected ? Color.accentColor : .secondary)
+      .frame(width: 38, height: 34)
 
       VStack(alignment: .leading, spacing: 5) {
-        Text(item.text)
+        Text(item.summaryText)
           .font(.system(size: 13.5))
           .foregroundStyle(.primary)
           .lineLimit(2)
+          .truncationMode(.tail)
           .multilineTextAlignment(.leading)
           .frame(maxWidth: .infinity, alignment: .leading)
 
-        HStack(spacing: 7) {
-          Text(relativeTime(item.createdAt))
+        HStack(spacing: 6) {
+          Text(item.kind == .text ? "文本" : "图片")
           Text("·")
-          Text("\(item.text.count) 字符")
-          if item.copyCount > 1 {
-            Text("·")
-            Text("复制 \(item.copyCount) 次")
+          if item.kind == .text {
+            Text("\(item.text.count) 字符")
+          } else {
+            Text(item.imageDimensionsText)
           }
+          Text("·")
+          Text(relativeTime(item.createdAt))
         }
         .font(.system(size: 10.5))
         .foregroundStyle(.tertiary)
+        .lineLimit(1)
       }
 
       Button(action: onDelete) {
         Image(systemName: "trash")
           .font(.system(size: 11, weight: .medium))
-          .frame(width: 28, height: 28)
+          .frame(width: 26, height: 26)
           .contentShape(Rectangle())
       }
       .buttonStyle(.plain)
       .foregroundStyle(.secondary)
+      .opacity(isHovered || isSelected ? 1 : 0)
       .help("删除这条记录")
     }
-    .padding(.horizontal, 10)
+    .padding(.horizontal, 9)
     .padding(.vertical, 8)
     .background(
-      isSelected ? Color.white.opacity(0.095) : Color.clear,
+      isSelected
+        ? Color.white.opacity(0.095)
+        : (isHovered ? Color.white.opacity(0.045) : Color.clear),
       in: RoundedRectangle(cornerRadius: 10)
     )
     .contentShape(Rectangle())
-    .onTapGesture(perform: onSelect)
-    .onHover(perform: onHover)
+    .onTapGesture(count: 2, perform: onActivate)
+    .onTapGesture(count: 1, perform: onSelect)
+    .onHover { isHovered = $0 }
+  }
+}
+
+private struct ClipboardImagePreview: View {
+  let item: ClipboardItem
+  @ObservedObject var history: ClipboardHistory
+
+  private var image: NSImage? {
+    history.imageData(for: item).flatMap(NSImage.init(data:))
   }
 
-  private func relativeTime(_ date: Date) -> String {
-    let formatter = RelativeDateTimeFormatter()
-    formatter.unitsStyle = .short
-    return formatter.localizedString(for: date, relativeTo: Date())
+  var body: some View {
+    ZStack {
+      Color.white.opacity(0.025)
+
+      if let image {
+        Image(nsImage: image)
+          .resizable()
+          .interpolation(.high)
+          .scaledToFit()
+          .padding(22)
+      } else {
+        VStack(spacing: 10) {
+          Image(systemName: "photo.badge.exclamationmark")
+            .font(.system(size: 32, weight: .light))
+            .foregroundStyle(.orange)
+          Text("无法读取本地图片")
+            .font(.system(size: 13))
+            .foregroundStyle(.secondary)
+        }
+      }
+    }
   }
 }
 
@@ -297,4 +415,16 @@ private struct KeyHint: View {
         .foregroundStyle(.tertiary)
     }
   }
+}
+
+private func relativeTime(_ date: Date) -> String {
+  let formatter = RelativeDateTimeFormatter()
+  formatter.unitsStyle = .short
+  return formatter.localizedString(for: date, relativeTo: Date())
+}
+
+private func formattedByteCount(_ byteCount: Int) -> String {
+  let formatter = ByteCountFormatter()
+  formatter.countStyle = .file
+  return formatter.string(fromByteCount: Int64(byteCount))
 }

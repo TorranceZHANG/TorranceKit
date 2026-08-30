@@ -8,8 +8,10 @@ final class ClipboardMonitor {
   private var lastChangeCount: Int
   private var pollInterval: TimeInterval = 0.45
   private var maxTextBytes = 1_048_576
+  private var maxImageBytes = 20_971_520
+  private var capturesImages = true
   private var excludedBundleIdentifiers: Set<String> = []
-  private var ignoredTextOnce: String?
+  private var ignoredPayloadOnce: ClipboardPayload?
 
   var isPaused = false {
     didSet {
@@ -48,6 +50,8 @@ final class ClipboardMonitor {
     let shouldRestart = timer != nil && newInterval != pollInterval
     pollInterval = newInterval
     maxTextBytes = settings.maxTextBytes
+    maxImageBytes = settings.maxImageBytes
+    capturesImages = settings.capturesImages
     excludedBundleIdentifiers = Set(settings.excludedBundleIdentifiers)
     if shouldRestart {
       timer?.invalidate()
@@ -56,8 +60,8 @@ final class ClipboardMonitor {
     }
   }
 
-  func ignoreNextChange(containing text: String) {
-    ignoredTextOnce = text
+  func ignoreNextChange(containing payload: ClipboardPayload) {
+    ignoredPayloadOnce = payload
   }
 
   private func scheduleTimer() {
@@ -75,7 +79,7 @@ final class ClipboardMonitor {
     timer = nil
   }
 
-  private func poll() {
+  func poll() {
     guard pasteboard.changeCount != lastChangeCount else { return }
     lastChangeCount = pasteboard.changeCount
     guard !isPaused else { return }
@@ -87,15 +91,106 @@ final class ClipboardMonitor {
     {
       return
     }
-    guard let text = pasteboard.string(forType: .string) else { return }
-    if let ignoredTextOnce {
-      self.ignoredTextOnce = nil
-      if text == ignoredTextOnce { return }
+    let includesNativeImage = types.contains(.png) || types.contains(.tiff)
+    if capturesImages, includesNativeImage {
+      guard let image = capturedImage() else { return }
+      let payload = ClipboardPayload.image(pngData: image.pngData)
+      guard !shouldIgnore(payload) else { return }
+      _ = history.add(
+        imagePNGData: image.pngData,
+        pixelWidth: image.pixelWidth,
+        pixelHeight: image.pixelHeight
+      )
+      return
     }
 
-    // Avoid an accidental multi-megabyte clipboard entry making the UI or
-    // the local history file unusable.
+    guard let text = pasteboard.string(forType: .string) else {
+      if capturesImages, let image = capturedImage() {
+        let payload = ClipboardPayload.image(pngData: image.pngData)
+        guard !shouldIgnore(payload) else { return }
+        _ = history.add(
+          imagePNGData: image.pngData,
+          pixelWidth: image.pixelWidth,
+          pixelHeight: image.pixelHeight
+        )
+      }
+      return
+    }
+
     guard text.utf8.count <= maxTextBytes else { return }
+    let payload = ClipboardPayload.text(text)
+    guard !shouldIgnore(payload) else { return }
     history.add(text: text)
   }
+
+  private func shouldIgnore(_ payload: ClipboardPayload) -> Bool {
+    guard let ignoredPayloadOnce else { return false }
+    self.ignoredPayloadOnce = nil
+    return payload == ignoredPayloadOnce
+  }
+
+  private func capturedImage() -> CapturedImage? {
+    if let pngData = pasteboard.data(forType: .png) {
+      guard pngData.count <= maxImageBytes,
+        let representation = NSBitmapImageRep(data: pngData),
+        Self.isAllowedImageSize(
+          width: representation.pixelsWide,
+          height: representation.pixelsHigh
+        )
+      else {
+        return nil
+      }
+      return CapturedImage(
+        pngData: pngData,
+        pixelWidth: representation.pixelsWide,
+        pixelHeight: representation.pixelsHigh
+      )
+    }
+
+    if let tiffData = pasteboard.data(forType: .tiff),
+      tiffData.count <= maxImageBytes * 4,
+      let image = NSImage(data: tiffData)
+    {
+      return normalizedPNGData(from: image)
+    }
+
+    guard let image = NSImage(pasteboard: pasteboard) else { return nil }
+    return normalizedPNGData(from: image)
+  }
+
+  private func normalizedPNGData(from image: NSImage) -> CapturedImage? {
+    var proposedRect = NSRect(origin: .zero, size: image.size)
+    guard let cgImage = image.cgImage(
+      forProposedRect: &proposedRect,
+      context: nil,
+      hints: nil
+    ), Self.isAllowedImageSize(width: cgImage.width, height: cgImage.height)
+    else {
+      return nil
+    }
+
+    let representation = NSBitmapImageRep(cgImage: cgImage)
+    guard let pngData = representation.representation(using: .png, properties: [:]),
+      pngData.count <= maxImageBytes
+    else {
+      return nil
+    }
+    return CapturedImage(
+      pngData: pngData,
+      pixelWidth: cgImage.width,
+      pixelHeight: cgImage.height
+    )
+  }
+
+  private static func isAllowedImageSize(width: Int, height: Int) -> Bool {
+    guard width > 0, height > 0 else { return false }
+    return width <= 32_768 && height <= 32_768
+      && Int64(width) * Int64(height) <= 100_000_000
+  }
+}
+
+private struct CapturedImage {
+  let pngData: Data
+  let pixelWidth: Int
+  let pixelHeight: Int
 }
