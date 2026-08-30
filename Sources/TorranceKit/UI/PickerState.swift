@@ -5,10 +5,17 @@ import Foundation
 final class PickerState: ObservableObject {
   @Published var query = ""
   @Published var selectedIndex = 0
+  @Published private(set) var selectionScrollRequest = 0
 
   func reset() {
     query = ""
     selectedIndex = 0
+    requestSelectionScroll()
+  }
+
+  func selectFirstAndRequestScroll() {
+    selectedIndex = 0
+    requestSelectionScroll()
   }
 
   func filteredItems(from items: [ClipboardItem]) -> [ClipboardItem] {
@@ -25,6 +32,7 @@ final class PickerState: ObservableObject {
       return
     }
     selectedIndex = min(max(selectedIndex + delta, 0), itemCount - 1)
+    requestSelectionScroll()
   }
 
   func normalizeSelection(itemCount: Int) {
@@ -33,5 +41,9 @@ final class PickerState: ObservableObject {
       return
     }
     selectedIndex = min(selectedIndex, itemCount - 1)
+  }
+
+  private func requestSelectionScroll() {
+    selectionScrollRequest &+= 1
   }
 }

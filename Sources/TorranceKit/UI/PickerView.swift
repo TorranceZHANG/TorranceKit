@@ -38,7 +38,7 @@ struct PickerView: View {
       }
     }
     .onChange(of: state.query) { _ in
-      state.selectedIndex = 0
+      state.selectFirstAndRequestScroll()
     }
     .onChange(of: history.items.count) { newCount in
       state.normalizeSelection(itemCount: min(newCount, filteredItems.count))
@@ -121,7 +121,8 @@ struct PickerView: View {
           .padding(.horizontal, 10)
           .padding(.vertical, 9)
         }
-        .onChange(of: state.selectedIndex) { newIndex in
+        .onChange(of: state.selectionScrollRequest) { _ in
+          let newIndex = state.selectedIndex
           guard filteredItems.indices.contains(newIndex) else { return }
           withAnimation(.easeOut(duration: 0.12)) {
             proxy.scrollTo(filteredItems[newIndex].id, anchor: .center)
