@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="background" x1="124" y1="88" x2="900" y2="936" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#7C5CFC"/>
+      <stop offset="0.52" stop-color="#4A7DFF"/>
+      <stop offset="1" stop-color="#1BB9D6"/>
+    </linearGradient>
+    <linearGradient id="surface" x1="280" y1="218" x2="760" y2="806" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#E9EEFF"/>
+    </linearGradient>
+    <filter id="shadow" x="-30%" y="-30%" width="160%" height="170%">
+      <feDropShadow dx="0" dy="34" stdDeviation="36" flood-color="#13204F" flood-opacity="0.34"/>
+    </filter>
+    <clipPath id="icon-shape">
+      <rect x="58" y="58" width="908" height="908" rx="218"/>
+    </clipPath>
+  </defs>
+  <g clip-path="url(#icon-shape)">
+    <rect x="58" y="58" width="908" height="908" rx="218" fill="url(#background)"/>
+    <circle cx="788" cy="232" r="184" fill="#FFFFFF" opacity="0.09"/>
+    <circle cx="196" cy="848" r="218" fill="#112970" opacity="0.10"/>
+  </g>
+  <g filter="url(#shadow)">
+    <rect x="244" y="214" width="548" height="596" rx="124" fill="#17275D" opacity="0.34" transform="rotate(-4 244 214)"/>
+    <rect x="256" y="214" width="512" height="596" rx="116" fill="url(#surface)"/>
+
+    <rect x="316" y="282" width="176" height="176" rx="50" fill="#526FE5"/>
+    <rect x="532" y="282" width="176" height="176" rx="50" fill="#765DE7"/>
+    <rect x="316" y="498" width="176" height="176" rx="50" fill="#26A7CB"/>
+    <rect x="532" y="498" width="176" height="176" rx="50" fill="#3D7FE8"/>
+
+    <rect x="359" y="329" width="90" height="91" rx="18" fill="none" stroke="#FFFFFF" stroke-width="18"/>
+    <rect x="382" y="310" width="44" height="28" rx="12" fill="#FFFFFF"/>
+
+    <path d="M606 330 L572 370 L606 410" fill="none" stroke="#FFFFFF" stroke-width="18" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M634 330 L668 370 L634 410" fill="none" stroke="#FFFFFF" stroke-width="18" stroke-linecap="round" stroke-linejoin="round"/>
+
+    <path d="M418 534 L360 598 H402 L388 648 L450 578 H409 Z" fill="#FFFFFF"/>
+
+    <circle cx="620" cy="586" r="45" fill="none" stroke="#FFFFFF" stroke-width="18"/>
+    <path d="M620 520 V542 M620 630 V652 M554 586 H576 M664 586 H686 M573 539 L589 555 M651 617 L667 633 M667 539 L651 555 M589 617 L573 633" fill="none" stroke="#FFFFFF" stroke-width="16" stroke-linecap="round"/>
+  </g>
+</svg>

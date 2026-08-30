@@ -1,0 +1,16 @@
+{
+  "autoPaste": true,
+  "excludedBundleIdentifiers": [],
+  "hotKey": {
+    "doubleTapIntervalMilliseconds": 400,
+    "doubleTapModifier": "control",
+    "key": "V",
+    "mode": "keyCombination",
+    "modifiers": ["option"]
+  },
+  "maxItems": 1000,
+  "maxTextBytes": 1048576,
+  "pasteDelayMilliseconds": 160,
+  "pollIntervalMilliseconds": 450,
+  "retentionDays": 30
+}

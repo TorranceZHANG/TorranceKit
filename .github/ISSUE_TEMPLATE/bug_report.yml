@@ -1,0 +1,28 @@
+name: Bug 报告
+description: 报告可复现的问题
+title: "[Bug] "
+labels: [bug]
+body:
+  - type: textarea
+    attributes:
+      label: 问题描述
+      description: 请勿粘贴任何敏感剪贴板内容。
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: 复现步骤
+    validations:
+      required: true
+  - type: input
+    attributes:
+      label: macOS 与芯片型号
+      placeholder: macOS 15.1 / M3
+    validations:
+      required: true
+  - type: input
+    attributes:
+      label: TorranceKit 版本
+      placeholder: 0.1.0
+    validations:
+      required: true

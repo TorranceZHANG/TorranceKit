@@ -1,0 +1,10 @@
+.build/
+dist/
+.DS_Store
+*.xcuserstate
+.swiftpm/
+
+# Local work-item metadata; not part of the public GitHub project.
+.workitem.json
+AGENTS.md
+CLAUDE.md

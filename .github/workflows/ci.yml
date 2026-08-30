@@ -1,0 +1,23 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test-and-build:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: 显示工具链版本
+        run: swift --version
+      - name: 运行核心与 SwiftPM 测试
+        run: make test
+      - name: 构建应用包
+        run: ./scripts/build_app.sh
+      - name: 验证应用包
+        run: |
+          plutil -lint dist/TorranceKit.app/Contents/Info.plist
+          codesign --verify --deep --strict --verbose=2 dist/TorranceKit.app
+          file dist/TorranceKit.app/Contents/MacOS/TorranceKit | grep arm64

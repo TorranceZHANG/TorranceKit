@@ -1,0 +1,74 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  signed-release:
+    runs-on: macos-15
+    env:
+      BUILD_CERTIFICATE_BASE64: ${{ secrets.BUILD_CERTIFICATE_BASE64 }}
+      P12_PASSWORD: ${{ secrets.P12_PASSWORD }}
+      KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+      DEVELOPER_ID_APPLICATION: ${{ secrets.DEVELOPER_ID_APPLICATION }}
+      APPLE_ID: ${{ secrets.APPLE_ID }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      APP_SPECIFIC_PASSWORD: ${{ secrets.APP_SPECIFIC_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 校验发布凭据
+        run: |
+          for name in BUILD_CERTIFICATE_BASE64 P12_PASSWORD KEYCHAIN_PASSWORD DEVELOPER_ID_APPLICATION APPLE_ID APPLE_TEAM_ID APP_SPECIFIC_PASSWORD; do
+            if [[ -z "${!name}" ]]; then
+              echo "::error::缺少 GitHub Secret: $name"
+              exit 1
+            fi
+          done
+
+      - name: 导入 Developer ID 证书
+        run: |
+          certificate_path="$RUNNER_TEMP/developer-id.p12"
+          keychain_path="$RUNNER_TEMP/torrancekit-signing.keychain-db"
+          printf '%s' "$BUILD_CERTIFICATE_BASE64" | base64 --decode --output "$certificate_path"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$keychain_path"
+          security set-keychain-settings -lut 21600 "$keychain_path"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$keychain_path"
+          security import "$certificate_path" -P "$P12_PASSWORD" -A -t cert -f pkcs12 -k "$keychain_path"
+          security list-keychain -d user -s "$keychain_path"
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$KEYCHAIN_PASSWORD" "$keychain_path"
+
+      - name: 测试并构建签名版本
+        run: |
+          make test
+          version="${GITHUB_REF_NAME#v}"
+          APP_VERSION="$version" BUILD_NUMBER="$GITHUB_RUN_NUMBER" CODE_SIGN_IDENTITY="$DEVELOPER_ID_APPLICATION" ./scripts/build_app.sh
+          ditto -c -k --norsrc --keepParent dist/TorranceKit.app "$RUNNER_TEMP/TorranceKit-notarize.zip"
+
+      - name: Apple 公证并装订票据
+        run: |
+          xcrun notarytool submit "$RUNNER_TEMP/TorranceKit-notarize.zip" \
+            --apple-id "$APPLE_ID" \
+            --team-id "$APPLE_TEAM_ID" \
+            --password "$APP_SPECIFIC_PASSWORD" \
+            --wait
+          xcrun stapler staple dist/TorranceKit.app
+          xcrun stapler validate dist/TorranceKit.app
+
+      - name: 打包并创建 GitHub Release
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          archive="dist/TorranceKit-$version-macOS-arm64.zip"
+          ditto -c -k --norsrc --keepParent dist/TorranceKit.app "$archive"
+          (cd dist && shasum -a 256 "TorranceKit-$version-macOS-arm64.zip" > "TorranceKit-$version-macOS-arm64.zip.sha256")
+          gh release create "$GITHUB_REF_NAME" "$archive" "$archive.sha256" --generate-notes --verify-tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: 清理临时钥匙串
+        if: always()
+        run: security delete-keychain "$RUNNER_TEMP/torrancekit-signing.keychain-db" || true
