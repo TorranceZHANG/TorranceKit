@@ -226,17 +226,25 @@ TorranceKit App 运行时不联网、不上传内容。暂停记录期间产生�
 
 ## 卸载
 
-默认只把应用移到废纸篓，保留历史和配置：
+默认会停止 TorranceKit/PasteNook，注销它们在两个“应用程序”目录中的全部副本并移到废纸篓，同时移除可能遗留的启动项；历史和配置仍会保留：
 
 ```bash
 ./scripts/uninstall.sh
 ```
 
-同时永久清理本地数据：
+同时永久清理 TorranceKit 和旧版 PasteNook 的历史、图片、配置、偏好、缓存、保存状态与隐私权限记录：
 
 ```bash
 ./scripts/uninstall.sh --purge-data
 ```
+
+在真正卸载前，可以预览本机将执行的操作：
+
+```bash
+./scripts/uninstall.sh --purge-data --dry-run
+```
+
+应用会移到废纸篓以便恢复；`--purge-data` 清理的用户数据无法恢复。自动化运行时可追加 `--yes` 跳过永久删除确认。
 
 ## 开发验证
 
