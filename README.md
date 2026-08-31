@@ -87,13 +87,13 @@ open dist/TorranceKit.app
 
 ### 从 GitHub Release 安装
 
-正式发布后，下载 `TorranceKit-<版本>-macOS-arm64.zip`，解压后把 `TorranceKit.app` 拖入“应用程序”。Release 工作流已预留 Developer ID 签名和 Apple 公证，详见 [发布指南](docs/RELEASING.md)。
+正式发布后，下载 `TorranceKit-<版本>-macOS-arm64.zip`，解压后把 `TorranceKit.app` 拖入“应用程序”。当前 Release 使用 ad-hoc 签名且未经过 Apple 公证，首次打开时可能需要在“系统设置 → 隐私与安全性”中选择“仍要打开”，详见 [发布指南](docs/RELEASING.md)。
 
 ### 辅助功能权限
 
 首次选择内容时，如果尚未授权，TorranceKit 只会把内容放回系统剪贴板。点击浮层底部或菜单栏里的“开启自动粘贴权限”，在“系统设置 → 隐私与安全性 → 辅助功能”中启用 TorranceKit，即可自动完成 `⌘V`。
 
-如果重新构建后 macOS 未沿用辅助功能权限，先在系统设置中删除旧的 TorranceKit 条目，再重新添加 `dist/TorranceKit.app`。正式发布时应使用稳定的 Apple Developer 签名替代脚本默认的 ad-hoc 签名：
+如果重新构建后 macOS 未沿用辅助功能权限，先在系统设置中删除旧的 TorranceKit 条目，再重新添加 `dist/TorranceKit.app`。当前本地构建和 GitHub Release 都使用 ad-hoc 签名；以后加入 Apple Developer Program 后，可以改用稳定的 Developer ID 签名：
 
 ```bash
 CODE_SIGN_IDENTITY="Developer ID Application: Your Name (TEAMID)" ./scripts/build_app.sh

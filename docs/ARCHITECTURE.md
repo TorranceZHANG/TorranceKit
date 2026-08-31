@@ -75,4 +75,4 @@ TorranceKit 使用新的应用名、Bundle ID 和数据根目录。首次启动�
 
 ## 发布模型
 
-普通 CI 做单元测试和 ad-hoc 签名构建。正式 GitHub Release 导入 Developer ID 证书，启用 Hardened Runtime，提交 Apple 公证并把票据装订到应用后再归档。
+普通 CI 和 GitHub Release 都会执行单元测试及 ad-hoc 签名构建。Release 额外校验版本、Info.plist、arm64 架构和代码签名完整性，并生成 zip 与 SHA-256 校验文件；当前不导入 Developer ID 证书，也不提交 Apple 公证。
