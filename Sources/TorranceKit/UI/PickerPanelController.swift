@@ -19,6 +19,10 @@ final class PickerPanelController: NSObject, NSWindowDelegate {
     .transient,
     .fullScreenAuxiliary,
   ]
+  static let styleMask: NSWindow.StyleMask = [
+    .borderless,
+    .fullSizeContentView,
+  ]
 
   init(
     history: ClipboardHistory,
@@ -34,7 +38,7 @@ final class PickerPanelController: NSObject, NSWindowDelegate {
 
     let panel = PickerPanel(
       contentRect: NSRect(x: 0, y: 0, width: 1_000, height: 620),
-      styleMask: [.borderless, .fullSizeContentView, .nonactivatingPanel],
+      styleMask: Self.styleMask,
       backing: .buffered,
       defer: false
     )
@@ -45,6 +49,8 @@ final class PickerPanelController: NSObject, NSWindowDelegate {
     panel.hasShadow = true
     panel.collectionBehavior = Self.collectionBehavior
     panel.isMovableByWindowBackground = true
+    panel.becomesKeyOnlyIfNeeded = false
+    panel.acceptsMouseMovedEvents = true
 
     let view = PickerView(
       history: history,
@@ -107,8 +113,9 @@ final class PickerPanelController: NSObject, NSWindowDelegate {
 
   func show() {
     if panel.isVisible {
+      NSApp.activate(ignoringOtherApps: true)
       panel.orderFrontRegardless()
-      panel.makeKey()
+      panel.makeKeyAndOrderFront(nil)
       return
     }
 
@@ -125,8 +132,12 @@ final class PickerPanelController: NSObject, NSWindowDelegate {
     state.reset()
     positionPanel()
     installKeyboardMonitor()
+    // A visible non-activating panel can remain unable to receive mouse and keyboard
+    // events when LaunchServices still has an older build registered. Explicitly
+    // activate this accessory application and make a regular panel key instead.
+    NSApp.activate(ignoringOtherApps: true)
     panel.orderFrontRegardless()
-    panel.makeKey()
+    panel.makeKeyAndOrderFront(nil)
   }
 
   func toggle() {

@@ -65,6 +65,13 @@ final class PickerStateTests: XCTestCase {
     XCTAssertFalse(behavior.contains(.canJoinAllSpaces))
   }
 
+  func testPickerUsesAnActivatingKeyPanel() {
+    let styleMask = PickerPanelController.styleMask
+    XCTAssertTrue(styleMask.contains(.borderless))
+    XCTAssertTrue(styleMask.contains(.fullSizeContentView))
+    XCTAssertFalse(styleMask.contains(.nonactivatingPanel))
+  }
+
   func testLongTextPreviewIsBoundedWithoutChangingTheOriginal() {
     let text = String(repeating: "a", count: 200_001)
     let preview = ClipboardPreviewLoader.textPreview(for: text)
