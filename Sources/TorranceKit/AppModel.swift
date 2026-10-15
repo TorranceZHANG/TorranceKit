@@ -8,6 +8,7 @@ final class AppModel: ObservableObject {
   let history: ClipboardHistory
   let permission: AccessibilityPermission
   let configuration: AppConfiguration
+  @Published private(set) var shortcutError: String?
 
   @Published var isCaptureEnabled: Bool {
     didSet {
@@ -18,6 +19,8 @@ final class AppModel: ObservableObject {
 
   private let monitor: ClipboardMonitor
   private let hotKey: GlobalHotKey
+  private let launcherHotKey: GlobalHotKey
+  private var permissionSubscription: AnyCancellable?
   private static let captureEnabledKey = "captureEnabled"
   private static let legacyBundleIdentifier = "com.torrance.PasteNook"
   private var hasStarted = false
@@ -26,6 +29,7 @@ final class AppModel: ObservableObject {
     history: history,
     permission: permission,
     configuration: configuration,
+    onInput: { [weak self] in self?.cancelDoubleTapSequences() },
     onOpenSettings: { [weak self] in
       self?.showSettings()
     }
@@ -34,6 +38,12 @@ final class AppModel: ObservableObject {
   }
 
   private lazy var settingsWindowController = SettingsWindowController(appModel: self)
+  private lazy var launcherController = LauncherPanelController(
+    configuration: configuration, permission: permission,
+    onInput: { [weak self] in self?.cancelDoubleTapSequences() },
+    onSettings: { [weak self] in self?.showSettings() },
+    onExecute: { [weak self] action in self?.execute(action) }
+  )
 
   private init() {
     AppPaths.migrateLegacyDataIfNeeded()
@@ -51,7 +61,8 @@ final class AppModel: ObservableObject {
     self.history = history
     self.permission = permission
     monitor = ClipboardMonitor(history: history)
-    hotKey = GlobalHotKey(configuration: settings.hotKey)
+    hotKey = GlobalHotKey(identifier: 1, configuration: settings.hotKey)
+    launcherHotKey = GlobalHotKey(identifier: 2, configuration: settings.launcher.hotKey)
 
     if UserDefaults.standard.object(forKey: Self.captureEnabledKey) == nil {
       isCaptureEnabled = true
@@ -63,6 +74,17 @@ final class AppModel: ObservableObject {
 
     hotKey.onPressed = { [weak self] in
       self?.togglePicker()
+    }
+    launcherHotKey.onPressed = { [weak self] in self?.toggleLauncher() }
+    if !hotKey.isRegistered || !launcherHotKey.isRegistered {
+      shortcutError = "部分快捷键注册失败，请在设置中调整呼出方式。"
+    }
+    permissionSubscription = permission.$isTrusted.removeDuplicates().dropFirst().sink { [weak self] _ in
+      MainActor.assumeIsolated {
+        guard let self else { return }
+        do { try self.replaceHotKeys(with: self.configuration.settings) }
+        catch { self.shortcutError = error.localizedDescription }
+      }
     }
   }
 
@@ -87,16 +109,32 @@ final class AppModel: ObservableObject {
 
   func stop() {
     monitor.stop()
+    hotKey.unregisterTrigger()
+    launcherHotKey.unregisterTrigger()
+    panelController.hide()
+    launcherController.hide()
+    PasteController.cancelPendingPaste()
   }
 
   func showPicker() {
+    PasteController.cancelPendingPaste()
+    launcherController.hide()
     history.prune()
     panelController.show()
   }
 
   func togglePicker() {
-    history.prune()
-    panelController.toggle()
+    panelController.isVisible ? panelController.hide() : showPicker()
+  }
+
+  func showLauncher() {
+    PasteController.cancelPendingPaste()
+    panelController.hide()
+    launcherController.show()
+  }
+
+  func toggleLauncher() {
+    launcherController.isVisible ? launcherController.hide() : showLauncher()
   }
 
   func confirmAndClearHistory() {
@@ -111,6 +149,9 @@ final class AppModel: ObservableObject {
   }
 
   func showSettings() {
+    PasteController.cancelPendingPaste()
+    panelController.hide()
+    launcherController.hide()
     settingsWindowController.show()
   }
 
@@ -126,13 +167,8 @@ final class AppModel: ObservableObject {
   func saveConfiguration(_ candidate: AppSettings) throws -> AppSettings {
     let newSettings = try candidate.validated()
     let oldSettings = configuration.settings
-    try hotKey.update(configuration: newSettings.hotKey)
-
-    do {
+    try replaceHotKeys(with: newSettings, previous: oldSettings) {
       try configuration.writeToDisk(newSettings)
-    } catch {
-      try? hotKey.update(configuration: oldSettings.hotKey)
-      throw error
     }
 
     applyConfiguration(newSettings)
@@ -142,7 +178,7 @@ final class AppModel: ObservableObject {
   @discardableResult
   func reloadConfigurationFromDisk() throws -> AppSettings {
     let newSettings = try configuration.readFromDisk()
-    try hotKey.update(configuration: newSettings.hotKey)
+    try replaceHotKeys(with: newSettings)
     applyConfiguration(newSettings)
     return newSettings
   }
@@ -169,6 +205,53 @@ final class AppModel: ObservableObject {
     configuration.apply(newSettings)
     history.applyRetentionPolicy(newSettings.retentionPolicy)
     monitor.apply(settings: newSettings)
+    launcherController.model.update(settings: newSettings.launcher)
+  }
+
+  private func replaceHotKeys(
+    with candidate: AppSettings, previous: AppSettings? = nil, persist: () throws -> Void = {}
+  ) throws {
+    do {
+      try HotKeyTransaction.apply(
+        previous: previous ?? configuration.settings, candidate: candidate,
+        unregister: {
+          self.hotKey.unregisterTrigger()
+          self.launcherHotKey.unregisterTrigger()
+        },
+        register: { settings in
+          try self.hotKey.registerTrigger(configuration: settings.hotKey)
+          try self.launcherHotKey.registerTrigger(configuration: settings.launcher.hotKey)
+        }, persist: persist
+      )
+      shortcutError = nil
+    } catch {
+      if !hotKey.isRegistered || !launcherHotKey.isRegistered {
+        shortcutError = error.localizedDescription
+      }
+      throw error
+    }
+  }
+
+  private func execute(_ action: LauncherAction) {
+    switch action {
+    case .clipboard: showPicker()
+    case .settings: showSettings()
+    case .copy(let text):
+      monitor.ignoreNextChange(containing: .text(text))
+      if !PasteController.write(.text(text), to: .general) {
+        showAlert(title: "复制失败", message: "无法写入系统剪贴板，请重试。", style: .warning)
+      }
+    case .openApplication(let url), .openURL(let url):
+      if !NSWorkspace.shared.open(url) {
+        showAlert(title: "无法打开", message: "请检查应用或网址是否可用。", style: .warning)
+      }
+    case .none: break
+    }
+  }
+
+  private func cancelDoubleTapSequences() {
+    hotKey.cancelDoubleTapSequence()
+    launcherHotKey.cancelDoubleTapSequence()
   }
 
   private func select(

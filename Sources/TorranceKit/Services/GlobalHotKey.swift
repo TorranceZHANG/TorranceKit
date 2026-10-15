@@ -8,6 +8,7 @@ struct ModifierDoubleTapDetector {
   private var isModifierPressed = false
   private var firstPressTimestamp: TimeInterval?
   private var wasReleasedAfterFirstPress = false
+  private var isSecondPress = false
 
   init(maximumInterval: TimeInterval) {
     self.maximumInterval = maximumInterval
@@ -32,8 +33,8 @@ struct ModifierDoubleTapDetector {
         wasReleasedAfterFirstPress,
         timestamp - firstPressTimestamp <= maximumInterval
       {
-        resetSequence()
-        return true
+        isSecondPress = true
+        return false
       }
 
       firstPressTimestamp = timestamp
@@ -43,6 +44,10 @@ struct ModifierDoubleTapDetector {
 
     guard let firstPressTimestamp else { return false }
     if timestamp - firstPressTimestamp <= maximumInterval {
+      if isSecondPress {
+        resetSequence()
+        return true
+      }
       wasReleasedAfterFirstPress = true
     } else {
       resetSequence()
@@ -50,9 +55,14 @@ struct ModifierDoubleTapDetector {
     return false
   }
 
+  mutating func cancel() {
+    resetSequence()
+  }
+
   private mutating func resetSequence() {
     firstPressTimestamp = nil
     wasReleasedAfterFirstPress = false
+    isSecondPress = false
   }
 }
 
@@ -67,10 +77,11 @@ final class GlobalHotKey {
   private var localModifierMonitor: Any?
   private var modifierFlag: NSEvent.ModifierFlags?
   private var doubleTapDetector: ModifierDoubleTapDetector?
-  private let hotKeyID = EventHotKeyID(signature: 0x544B_5452, id: 1)  // TKTR
+  private let hotKeyID: EventHotKeyID
   private var configuration: HotKeyConfiguration
 
-  init(configuration: HotKeyConfiguration) {
+  init(identifier: UInt32, configuration: HotKeyConfiguration) {
+    hotKeyID = EventHotKeyID(signature: 0x544B_5452, id: identifier)
     self.configuration = configuration
     installCarbonHandler()
     do {
@@ -95,21 +106,6 @@ final class GlobalHotKey {
     }
   }
 
-  func update(configuration newConfiguration: HotKeyConfiguration) throws {
-    if newConfiguration == configuration, isRegistered { return }
-
-    let oldConfiguration = configuration
-    unregisterTrigger()
-
-    do {
-      try register(newConfiguration)
-      configuration = newConfiguration
-    } catch {
-      try? register(oldConfiguration)
-      throw error
-    }
-  }
-
   private func installCarbonHandler() {
     var eventType = EventTypeSpec(
       eventClass: OSType(kEventClassKeyboard),
@@ -119,7 +115,7 @@ final class GlobalHotKey {
     let status = InstallEventHandler(
       GetApplicationEventTarget(),
       { _, event, userData -> OSStatus in
-        guard let event, let userData else { return noErr }
+        guard let event, let userData else { return OSStatus(eventNotHandledErr) }
         var pressedID = EventHotKeyID()
         let result = GetEventParameter(
           event,
@@ -132,7 +128,7 @@ final class GlobalHotKey {
         )
         guard result == noErr else { return result }
 
-        MainActor.assumeIsolated {
+        return MainActor.assumeIsolated {
           let instance = Unmanaged<GlobalHotKey>
             .fromOpaque(userData)
             .takeUnretainedValue()
@@ -140,9 +136,10 @@ final class GlobalHotKey {
             pressedID.id == instance.hotKeyID.id
           {
             instance.onPressed?()
+            return noErr
           }
+          return OSStatus(eventNotHandledErr)
         }
-        return noErr
       },
       1,
       &eventType,
@@ -156,6 +153,7 @@ final class GlobalHotKey {
   }
 
   private func register(_ configuration: HotKeyConfiguration) throws {
+    guard eventHandlerRef != nil else { throw GlobalHotKeyError.handlerInstallationFailed }
     switch configuration.mode {
     case .keyCombination:
       try registerKeyCombination(configuration)
@@ -195,13 +193,14 @@ final class GlobalHotKey {
       maximumInterval: TimeInterval(configuration.doubleTapIntervalMilliseconds) / 1_000
     )
 
-    globalModifierMonitor = NSEvent.addGlobalMonitorForEvents(matching: .flagsChanged) {
+    let events: NSEvent.EventTypeMask = [.flagsChanged, .keyDown, .leftMouseDown, .rightMouseDown, .otherMouseDown, .scrollWheel]
+    globalModifierMonitor = NSEvent.addGlobalMonitorForEvents(matching: events) {
       [weak self] event in
-      DispatchQueue.main.async { [weak self] in
+      MainActor.assumeIsolated {
         self?.handleModifierEvent(event)
       }
     }
-    localModifierMonitor = NSEvent.addLocalMonitorForEvents(matching: .flagsChanged) {
+    localModifierMonitor = NSEvent.addLocalMonitorForEvents(matching: events) {
       [weak self] event in
       self?.handleModifierEvent(event)
       return event
@@ -215,6 +214,10 @@ final class GlobalHotKey {
   }
 
   private func handleModifierEvent(_ event: NSEvent) {
+    if event.type != .flagsChanged {
+      doubleTapDetector?.cancel()
+      return
+    }
     guard let modifierFlag, var detector = doubleTapDetector else { return }
     let standardFlags = event.modifierFlags.intersection([
       .command, .control, .option, .shift,
@@ -232,7 +235,7 @@ final class GlobalHotKey {
     }
   }
 
-  private func unregisterTrigger() {
+  func unregisterTrigger() {
     if let hotKeyRef {
       UnregisterEventHotKey(hotKeyRef)
       self.hotKeyRef = nil
@@ -248,6 +251,13 @@ final class GlobalHotKey {
     modifierFlag = nil
     doubleTapDetector = nil
     isRegistered = false
+  }
+
+  func cancelDoubleTapSequence() { doubleTapDetector?.cancel() }
+
+  func registerTrigger(configuration: HotKeyConfiguration) throws {
+    try register(configuration)
+    self.configuration = configuration
   }
 
   private static let carbonModifierFlags: [String: UInt32] = [
@@ -293,6 +303,7 @@ private enum GlobalHotKeyError: LocalizedError {
   case unsupportedModifier(String)
   case registrationFailed(String, OSStatus)
   case monitorInstallationFailed
+  case handlerInstallationFailed
 
   var errorDescription: String? {
     switch self {
@@ -304,6 +315,8 @@ private enum GlobalHotKeyError: LocalizedError {
       return "快捷键 \(hotKey) 注册失败（\(status)），可能已被其他应用占用"
     case .monitorInstallationFailed:
       return "无法安装双击修饰键监听器"
+    case .handlerInstallationFailed:
+      return "无法安装全局快捷键事件处理器"
     }
   }
 }

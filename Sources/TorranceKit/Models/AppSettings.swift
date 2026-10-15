@@ -30,6 +30,23 @@ struct HotKeyConfiguration: Codable, Equatable {
   var doubleTapIntervalMilliseconds: Int
 
   static let `default` = HotKeyConfiguration(key: "V", modifiers: ["option"])
+  static let clipboardDefault = HotKeyConfiguration(
+    mode: .doubleTapModifier, key: "V", modifiers: ["option"], doubleTapModifier: "control"
+  )
+  static let launcherDefault = HotKeyConfiguration(
+    mode: .doubleTapModifier, key: "SPACE", modifiers: ["option"], doubleTapModifier: "command"
+  )
+
+  func conflicts(with other: HotKeyConfiguration) -> Bool {
+    guard mode == other.mode else { return false }
+    switch mode {
+    case .doubleTapModifier:
+      return doubleTapModifier.lowercased() == other.doubleTapModifier.lowercased()
+    case .keyCombination:
+      return key.uppercased() == other.key.uppercased()
+        && Set(modifiers.map { $0.lowercased() }) == Set(other.modifiers.map { $0.lowercased() })
+    }
+  }
 
   init(
     mode: HotKeyTriggerMode = .keyCombination,
@@ -79,7 +96,7 @@ struct HotKeyConfiguration: Codable, Equatable {
     let normalizedModifiers = modifiers.map {
       $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
     }
-    guard !normalizedModifiers.isEmpty else {
+    guard mode == .doubleTapModifier || !normalizedModifiers.isEmpty else {
       throw ConfigurationError.invalidValue("hotKey.modifiers 至少需要一个修饰键")
     }
     guard normalizedModifiers.allSatisfy(allowedModifiers.contains) else {
@@ -150,11 +167,12 @@ struct AppSettings: Codable, Equatable {
   var autoPaste: Bool
   var pasteDelayMilliseconds: Int
   var excludedBundleIdentifiers: [String]
+  var launcher: LauncherSettings
 
   static let `default` = AppSettings(
     maxItems: 1_000,
     retentionDays: 30,
-    hotKey: .default,
+    hotKey: .clipboardDefault,
     capturesImages: true,
     maxTextBytes: 1_048_576,
     maxImageBytes: 20_971_520,
@@ -171,6 +189,10 @@ struct AppSettings: Codable, Equatable {
   func validated() throws -> AppSettings {
     _ = try retentionPolicy.validated()
     let hotKey = try hotKey.validated()
+    let launcher = try launcher.validated()
+    guard !hotKey.conflicts(with: launcher.hotKey) else {
+      throw ConfigurationError.invalidValue("启动器和剪贴板不能使用相同的呼出方式")
+    }
     guard (1_024...10_485_760).contains(maxTextBytes) else {
       throw ConfigurationError.invalidValue(
         "maxTextBytes 必须在 1024 到 10485760 之间"
@@ -199,6 +221,7 @@ struct AppSettings: Codable, Equatable {
 
     var result = self
     result.hotKey = hotKey
+    result.launcher = launcher
     result.excludedBundleIdentifiers = Array(Set(excludedBundleIdentifiers)).sorted()
     return result
   }
@@ -207,6 +230,7 @@ struct AppSettings: Codable, Equatable {
     case maxItems, retentionDays, hotKey, capturesImages, maxTextBytes, maxImageBytes
     case pollIntervalMilliseconds, autoPaste, pasteDelayMilliseconds
     case excludedBundleIdentifiers
+    case launcher
   }
 
   init(
@@ -219,7 +243,8 @@ struct AppSettings: Codable, Equatable {
     pollIntervalMilliseconds: Int,
     autoPaste: Bool,
     pasteDelayMilliseconds: Int,
-    excludedBundleIdentifiers: [String]
+    excludedBundleIdentifiers: [String],
+    launcher: LauncherSettings = .default
   ) {
     self.maxItems = maxItems
     self.retentionDays = retentionDays
@@ -231,6 +256,7 @@ struct AppSettings: Codable, Equatable {
     self.autoPaste = autoPaste
     self.pasteDelayMilliseconds = pasteDelayMilliseconds
     self.excludedBundleIdentifiers = excludedBundleIdentifiers
+    self.launcher = launcher
   }
 
   init(from decoder: Decoder) throws {
@@ -246,7 +272,13 @@ struct AppSettings: Codable, Equatable {
       : defaults.retentionDays
     hotKey =
       try container.decodeIfPresent(HotKeyConfiguration.self, forKey: .hotKey)
-      ?? defaults.hotKey
+      ?? HotKeyConfiguration.default
+    launcher = try container.decodeIfPresent(LauncherSettings.self, forKey: .launcher)
+      ?? defaults.launcher
+    // Existing clipboard bindings take precedence when upgrading from 0.2.x.
+    if !container.contains(.launcher), hotKey.conflicts(with: launcher.hotKey) {
+      launcher.hotKey = HotKeyConfiguration(key: "SPACE", modifiers: ["control", "option"])
+    }
     capturesImages =
       try container.decodeIfPresent(Bool.self, forKey: .capturesImages)
       ?? defaults.capturesImages
@@ -296,6 +328,7 @@ struct AppSettings: Codable, Equatable {
     try container.encode(autoPaste, forKey: .autoPaste)
     try container.encode(pasteDelayMilliseconds, forKey: .pasteDelayMilliseconds)
     try container.encode(excludedBundleIdentifiers, forKey: .excludedBundleIdentifiers)
+    try container.encode(launcher, forKey: .launcher)
   }
 }
 

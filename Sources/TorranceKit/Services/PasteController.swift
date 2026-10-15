@@ -3,20 +3,31 @@ import ApplicationServices
 
 @MainActor
 enum PasteController {
+  private static var generation = 0
+
+  static func cancelPendingPaste() { generation += 1 }
+
   static func copyAndPaste(
     payload: ClipboardPayload,
     into targetApplication: NSRunningApplication?,
     automatically: Bool,
     delayMilliseconds: Int
   ) {
+    cancelPendingPaste()
+    let requestGeneration = generation
     let pasteboard = NSPasteboard.general
-    write(payload, to: pasteboard)
+    guard write(payload, to: pasteboard) else { return }
 
     targetApplication?.activate(options: [.activateAllWindows, .activateIgnoringOtherApps])
-    guard automatically else { return }
+    guard automatically, let targetApplication, !targetApplication.isTerminated,
+      targetApplication.processIdentifier != ProcessInfo.processInfo.processIdentifier
+    else { return }
 
     let delay = TimeInterval(delayMilliseconds) / 1_000
     DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+      guard generation == requestGeneration, !targetApplication.isTerminated,
+        NSWorkspace.shared.frontmostApplication?.processIdentifier == targetApplication.processIdentifier
+      else { return }
       guard let source = CGEventSource(stateID: .hidSystemState),
         let keyDown = CGEvent(
           keyboardEventSource: source,

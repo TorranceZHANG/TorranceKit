@@ -39,6 +39,7 @@ final class SettingsTests: XCTestCase {
 
   func testVisualDraftRejectsShortcutWithoutModifier() {
     var draft = SettingsDraft(settings: .default)
+    draft.triggerMode = .keyCombination
     draft.usesCommand = false
     draft.usesControl = false
     draft.usesOption = false

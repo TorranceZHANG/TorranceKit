@@ -7,12 +7,14 @@ final class PickerPanelController: NSObject, NSWindowDelegate {
   private let state = PickerState()
   private let onSelect: (ClipboardItem, NSRunningApplication?) -> Void
   private let onOpenSettings: () -> Void
+  private let onInput: () -> Void
   private var panel: PickerPanel!
   private var keyboardMonitor: Any?
   private var targetApplication: NSRunningApplication?
   private var lastExternalApplication: NSRunningApplication?
   private var activationObserver: NSObjectProtocol?
   private var activeSpaceObserver: NSObjectProtocol?
+  var isVisible: Bool { panel.isVisible }
 
   static let collectionBehavior: NSWindow.CollectionBehavior = [
     .moveToActiveSpace,
@@ -28,11 +30,13 @@ final class PickerPanelController: NSObject, NSWindowDelegate {
     history: ClipboardHistory,
     permission: AccessibilityPermission,
     configuration: AppConfiguration,
+    onInput: @escaping () -> Void = {},
     onOpenSettings: @escaping () -> Void,
     onSelect: @escaping (ClipboardItem, NSRunningApplication?) -> Void
   ) {
     self.history = history
     self.onOpenSettings = onOpenSettings
+    self.onInput = onInput
     self.onSelect = onSelect
     super.init()
 
@@ -195,6 +199,7 @@ final class PickerPanelController: NSObject, NSWindowDelegate {
       [weak self] event in
       let shouldConsume = MainActor.assumeIsolated {
         guard let self, self.panel.isKeyWindow else { return false }
+        self.onInput()
         return self.handle(event)
       }
       return shouldConsume ? nil : event
@@ -209,6 +214,7 @@ final class PickerPanelController: NSObject, NSWindowDelegate {
   }
 
   private func handle(_ event: NSEvent) -> Bool {
+    if let editor = panel.firstResponder as? NSTextView, editor.hasMarkedText() { return false }
     let items = state.filteredItems(from: history.items)
     switch event.keyCode {
     case 53:  // Escape
