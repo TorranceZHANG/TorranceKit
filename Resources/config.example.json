@@ -1,13 +1,29 @@
 {
   "autoPaste": true,
+  "capturesImages": true,
   "excludedBundleIdentifiers": [],
   "hotKey": {
     "doubleTapIntervalMilliseconds": 400,
     "doubleTapModifier": "control",
     "key": "V",
-    "mode": "keyCombination",
+    "mode": "doubleTapModifier",
     "modifiers": ["option"]
   },
+  "launcher": {
+    "hotKey": {
+      "mode": "doubleTapModifier",
+      "doubleTapModifier": "command",
+      "doubleTapIntervalMilliseconds": 400,
+      "key": "SPACE",
+      "modifiers": ["option"]
+    },
+    "searchesApplications": true,
+    "calculatorEnabled": true,
+    "webSearchEnabled": true,
+    "searchEngine": "google",
+    "maxResults": 8
+  },
+  "maxImageBytes": 20971520,
   "maxItems": 1000,
   "maxTextBytes": 1048576,
   "pasteDelayMilliseconds": 160,

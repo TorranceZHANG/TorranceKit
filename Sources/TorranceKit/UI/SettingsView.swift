@@ -3,6 +3,7 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 struct SettingsDraft: Equatable {
+  var launcher: LauncherSettings
   var triggerMode: HotKeyTriggerMode
   var hotKeyKey: String
   var usesCommand: Bool
@@ -26,6 +27,7 @@ struct SettingsDraft: Equatable {
   var excludedBundleIdentifiersText: String
 
   init(settings: AppSettings) {
+    launcher = settings.launcher
     triggerMode = settings.hotKey.mode
     hotKeyKey = settings.hotKey.key
     usesCommand = settings.hotKey.modifiers.contains("command")
@@ -76,8 +78,17 @@ struct SettingsDraft: Equatable {
       pollIntervalMilliseconds: pollIntervalMilliseconds,
       autoPaste: autoPaste,
       pasteDelayMilliseconds: pasteDelayMilliseconds,
-      excludedBundleIdentifiers: excludedBundleIdentifiers
+      excludedBundleIdentifiers: excludedBundleIdentifiers,
+      launcher: launcher
     ).validated()
+  }
+
+  mutating func useDoubleTapPreset() {
+    let clipboard = HotKeyConfiguration.clipboardDefault
+    triggerMode = clipboard.mode
+    doubleTapModifier = clipboard.doubleTapModifier
+    doubleTapIntervalMilliseconds = clipboard.doubleTapIntervalMilliseconds
+    launcher.hotKey = .launcherDefault
   }
 }
 
@@ -136,7 +147,7 @@ final class SettingsViewModel: ObservableObject {
       draft = SettingsDraft(settings: savedSettings)
       status = Status(
         kind: .success,
-        message: "设置已保存，呼出方式 \(savedSettings.hotKey.displayText) 已生效。"
+        message: "已保存：启动器 \(savedSettings.launcher.hotKey.displayText)；剪贴板 \(savedSettings.hotKey.displayText)。"
       )
     } catch {
       status = Status(kind: .error, message: error.localizedDescription)
@@ -195,6 +206,9 @@ struct SettingsView: View {
   var body: some View {
     VStack(spacing: 0) {
       TabView {
+        LauncherSettingsView(model: model, permission: permission)
+          .tabItem { Label("启动器", systemImage: "magnifyingglass") }
+
         ClipboardSettingsView(model: model, permission: permission)
           .tabItem {
             Label("剪贴板", systemImage: "doc.on.clipboard")

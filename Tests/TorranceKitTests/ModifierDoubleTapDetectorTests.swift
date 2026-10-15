@@ -8,7 +8,36 @@ final class ModifierDoubleTapDetectorTests: XCTestCase {
 
     XCTAssertFalse(handle(&detector, pressed: true, at: 1.00))
     XCTAssertFalse(handle(&detector, pressed: false, at: 1.08))
-    XCTAssertTrue(handle(&detector, pressed: true, at: 1.28))
+    XCTAssertFalse(handle(&detector, pressed: true, at: 1.28))
+    XCTAssertTrue(handle(&detector, pressed: false, at: 1.32))
+    XCTAssertFalse(handle(&detector, pressed: false, at: 1.35))
+  }
+
+  func testCommandCopyDoesNotTriggerLauncher() {
+    var detector = ModifierDoubleTapDetector(maximumInterval: 0.4)
+    XCTAssertFalse(handle(&detector, pressed: true, at: 1.0))
+    detector.cancel() // C keyDown while Command is held.
+    XCTAssertFalse(handle(&detector, pressed: false, at: 1.05))
+    XCTAssertFalse(handle(&detector, pressed: true, at: 1.15))
+    detector.cancel()
+    XCTAssertFalse(handle(&detector, pressed: false, at: 1.20))
+  }
+
+  func testSecondTapUsedAsACommandShortcutCancels() {
+    var detector = ModifierDoubleTapDetector(maximumInterval: 0.4)
+    XCTAssertFalse(handle(&detector, pressed: true, at: 1.0))
+    XCTAssertFalse(handle(&detector, pressed: false, at: 1.05))
+    XCTAssertFalse(handle(&detector, pressed: true, at: 1.15))
+    detector.cancel()
+    XCTAssertFalse(handle(&detector, pressed: false, at: 1.20))
+  }
+
+  func testHoldingSecondTapDoesNotTrigger() {
+    var detector = ModifierDoubleTapDetector(maximumInterval: 0.4)
+    XCTAssertFalse(handle(&detector, pressed: true, at: 1.0))
+    XCTAssertFalse(handle(&detector, pressed: false, at: 1.05))
+    XCTAssertFalse(handle(&detector, pressed: true, at: 1.15))
+    XCTAssertFalse(handle(&detector, pressed: false, at: 2.0))
   }
 
   func testDoesNotTriggerWithoutAReleaseBetweenPresses() {

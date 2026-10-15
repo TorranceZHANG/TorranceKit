@@ -5,6 +5,16 @@ set -euo pipefail
 project_dir="${0:A:h:h}"
 source_svg="$project_dir/Resources/AppIcon.svg"
 output_icns="${1:-$project_dir/.build/torrancekit/AppIcon.icns}"
+source_icns="$project_dir/Resources/AppIcon.icns"
+
+# Ship the already-rendered project icon, so clean builds do not depend on
+# the machine's SVG ImageIO/QuickLook plug-in availability.
+if [[ -f "$source_icns" ]]; then
+    mkdir -p "${output_icns:h}"
+    cp "$source_icns" "$output_icns"
+    exit 0
+fi
+
 temporary_dir="$(mktemp -d)"
 iconset_dir="$temporary_dir/TorranceKit.iconset"
 master_png="$temporary_dir/icon_1024.png"

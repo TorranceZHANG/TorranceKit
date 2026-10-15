@@ -31,7 +31,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     // Let the menu-bar scene finish launching before making the accessory panel key.
     // Showing it in the same run-loop turn can make macOS immediately resign and hide it.
     DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
-      AppModel.shared.showPicker()
+      AppModel.shared.showLauncher()
     }
   }
 
@@ -39,7 +39,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     _ sender: NSApplication,
     hasVisibleWindows flag: Bool
   ) -> Bool {
-    AppModel.shared.showPicker()
+    AppModel.shared.showLauncher()
     return false
   }
 
@@ -62,6 +62,10 @@ private struct TorranceKitMenuView: View {
   }
 
   var body: some View {
+    Button("搜索与计算（\(configuration.settings.launcher.hotKey.displayText)）") {
+      model.showLauncher()
+    }
+
     Button("打开剪贴板（\(configuration.settings.hotKey.displayText)）") {
       model.showPicker()
     }
@@ -70,8 +74,8 @@ private struct TorranceKitMenuView: View {
 
     Toggle("记录剪贴板", isOn: $model.isCaptureEnabled)
 
-    if configuration.settings.autoPaste && !permission.isTrusted {
-      Button("开启自动粘贴权限…") {
+    if !permission.isTrusted {
+      Button("开启双击快捷键与自动粘贴权限…") {
         permission.request()
       }
     }
@@ -82,6 +86,10 @@ private struct TorranceKitMenuView: View {
     .disabled(history.items.isEmpty)
 
     Divider()
+
+    if let error = model.shortcutError {
+      Text(error)
+    }
 
     Button("设置…") {
       model.showSettings()

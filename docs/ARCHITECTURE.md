@@ -4,7 +4,7 @@
 
 TorranceKit 是单进程、无服务端的 macOS 菜单栏工具库。应用壳负责生命周期、菜单栏入口和通用本地路径；具体能力以模块形式接入。
 
-当前唯一的功能模块是剪贴板历史。它处理纯文本和位图图片，不读取文件列表或保留富文本格式，也不做云同步。图片统一规范化为 PNG 并在本机独立存储。
+当前模块包括搜索与计算启动器、剪贴板历史。启动器扫描本机应用、解析算式和网页动作；剪贴板处理纯文本和位图图片，不保留富文本，也不做云同步。
 
 ## 工具库分层
 
@@ -14,13 +14,17 @@ TorranceKitApp
     ├─ 应用壳：菜单栏、生命周期、AppPaths
     │
     └─ 功能模块
+         ├─ Launcher
+         │    ├─ ApplicationCatalog：后台应用目录扫描
+         │    ├─ CalculatorEngine：有界表达式解析
+         │    └─ LauncherQueryEngine / LauncherModel / LauncherPanelController
          └─ Clipboard
               ├─ 监听与历史
               ├─ 搜索与选择器
               └─ 粘贴与权限
 ```
 
-当前代码仍在单一 SwiftPM executable target 中，以避免在只有一个模块时过度拆分。当新增第二个模块时，再将共享能力抽到 `Core` target，各模块使用独立 target，应用 target 只做组合。
+目前保留单一 SwiftPM executable target，通过独立状态对象、服务和 action 类型分离模块。AppModel 统一窗口互斥、入口和配置事务；等模块形成稳定公共接口后再拆独立 target。
 
 ## 数据流
 
@@ -46,12 +50,16 @@ ClipboardMonitor ──敏感类型/应用/大小过滤──▶ ClipboardHistor
 - `ClipboardMonitor`：观察系统剪贴板，并以前台应用作为来源推断；识别 PNG/TIFF，校验尺寸与大小后统一转换为 PNG，不负责持久化。
 - `ClipboardHistory`：历史记录的唯一写入口，负责文本/图片去重、数量限制、时间限制、JSON 元数据和图片文件落盘，以及删除时的文件清理。
 - `AppConfiguration`：创建、校验和重新读取用户配置。
-- `GlobalHotKey`：组合快捷键通过 Carbon 注册；双击修饰键通过全局与本地 `flagsChanged` 监听，并用可测试的状态机限制时间窗口、要求中间松开且禁止其他修饰键混入。
+- `GlobalHotKey`：每个入口独立 Carbon ID，未知事件返回未处理；双击修饰键监听 flagsChanged、keyDown 和鼠标按下，两次完整轻点才触发。普通组合键和鼠标操作会取消候选，不吞输入。
+- `HotKeyTransaction`：同步替换两组快捷键，先释放两者再注册候选，支持绑定互换；注册或写盘失败时恢复原绑定，恢复失败会明确报错。
+- `LauncherModel`：同步解析当前查询、后台刷新应用目录；取消任务并用 generation 阻止旧窗口的扫描结果覆盖新窗口。
+- `LauncherQueryEngine`：根据输入返回明确的 LauncherAction。网页关键词和网址只产生动作，用户执行前不会访问网络。
+- `CalculatorEngine`：手写递归下降解析器，字符、UTF-8 字节和递归深度有界，拒绝无效和非有限数值。
 - `PickerPanelController`：保存唤起前的前台应用、管理浮层生命周期和快捷键。
 - `ClipboardPreviewLoader`：限制超长文本的界面预览规模，并在后台从私有 PNG 生成有界缩略图。
-- `PasteController`：把文本或 PNG/TIFF 图片写回剪贴板，恢复原应用；有权限时注入 `⌘V`。
+- `PasteController`：写回剪贴板、恢复原应用，延迟后确认目标仍在前台才注入 `⌘V`。打开任一入口/设置或开始另一次粘贴时取消旧任务。
 
-选择器使用 `moveToActiveSpace` 而非 `canJoinAllSpaces`，只进入呼出时的当前桌面；切换应用或桌面时控制器主动隐藏窗口。安装器通过 `--background-launch` 启动菜单栏进程，避免安装完成后自动弹出选择器，用户手动打开 App 时仍会进入选择器。
+两个浮层均进入当前桌面，失焦或切换桌面时隐藏。AppModel 的展示入口先隐藏另一个窗口，保证最多一个浮层。剪贴板控制器在应用启动时就记录最后一个外部应用，因此从启动器切换到剪贴板仍能找回原粘贴目标。安装仍后台启动，用户手动打开 App 则显示启动器。
 
 ## 新模块接入约定
 
@@ -72,6 +80,8 @@ ClipboardMonitor ──敏感类型/应用/大小过滤──▶ ClipboardHistor
 ## 兼容性与数据迁移
 
 TorranceKit 使用新的应用名、Bundle ID 和数据根目录。首次启动会在目标文件缺失时，将 PasteNook 的 `config.json` 和 `history.json` 复制到新路径；源文件保留，已有的 TorranceKit 文件不被覆盖。旧记录缺少 `kind` 字段时按文本解码。暂停记录偏好从旧 UserDefaults domain 单独迁移。
+
+0.3.0 保留顶层 hotKey（剪贴板），新增 launcher 配置分区。HotKeyConfiguration.default 继续表示旧 Option+V 解码默认；新建文件的 AppSettings.default 则使用 Control/Command 双击。旧用户已有绑定不被改写；缺少 launcher 且剪贴板已用 Command 双击时，启动器默认采用 Control+Option+Space。预设只改两个快捷键。
 
 ## 发布模型
 

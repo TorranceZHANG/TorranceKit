@@ -14,6 +14,7 @@ xcrun swiftc \
     -sdk "$sdk_path" \
     "$project_dir/Sources/TorranceKit/Models/ClipboardItem.swift" \
     "$project_dir/Sources/TorranceKit/Models/AppSettings.swift" \
+    "$project_dir/Sources/TorranceKit/Models/LauncherSettings.swift" \
     "$project_dir/Sources/TorranceKit/Services/AppPaths.swift" \
     "$project_dir/Sources/TorranceKit/Services/ClipboardHistory.swift" \
     "$project_dir/Tests/CoreTestRunner.swift" \
