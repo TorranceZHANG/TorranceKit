@@ -78,17 +78,10 @@ final class GlobalHotKey {
   private var modifierFlag: NSEvent.ModifierFlags?
   private var doubleTapDetector: ModifierDoubleTapDetector?
   private let hotKeyID: EventHotKeyID
-  private var configuration: HotKeyConfiguration
+  private var configuration: HotKeyConfiguration?
 
-  init(identifier: UInt32, configuration: HotKeyConfiguration) {
+  init(identifier: UInt32) {
     hotKeyID = EventHotKeyID(signature: 0x544B_5452, id: identifier)
-    self.configuration = configuration
-    installCarbonHandler()
-    do {
-      try register(configuration)
-    } catch {
-      NSLog("TorranceKit: %@", error.localizedDescription)
-    }
   }
 
   deinit {
@@ -132,7 +125,8 @@ final class GlobalHotKey {
           let instance = Unmanaged<GlobalHotKey>
             .fromOpaque(userData)
             .takeUnretainedValue()
-          if pressedID.signature == instance.hotKeyID.signature,
+          if instance.isRegistered,
+            pressedID.signature == instance.hotKeyID.signature,
             pressedID.id == instance.hotKeyID.id
           {
             instance.onPressed?()
@@ -256,8 +250,20 @@ final class GlobalHotKey {
   func cancelDoubleTapSequence() { doubleTapDetector?.cancel() }
 
   func registerTrigger(configuration: HotKeyConfiguration) throws {
-    try register(configuration)
+    unregisterTrigger()
     self.configuration = configuration
+    if eventHandlerRef == nil { installCarbonHandler() }
+    do {
+      try register(configuration)
+    } catch {
+      unregisterTrigger()
+      throw error
+    }
+  }
+
+  func refreshDoubleTapMonitor() throws {
+    guard let configuration, configuration.mode == .doubleTapModifier else { return }
+    try registerTrigger(configuration: configuration)
   }
 
   private static let carbonModifierFlags: [String: UInt32] = [

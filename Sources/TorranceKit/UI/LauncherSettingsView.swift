@@ -13,14 +13,7 @@ struct LauncherSettingsView: View {
             Button("使用双击 Command / Control 预设") { model.draft.useDoubleTapPreset() }
             Text("只修改两个入口；点击下方“保存并应用”生效。旧版配置会保留原剪贴板快捷键。")
               .font(.caption).foregroundStyle(.secondary)
-            if !permission.isTrusted {
-              HStack {
-                Label("双击快捷键需要辅助功能权限", systemImage: "hand.raised")
-                  .font(.caption).foregroundStyle(.orange)
-                Spacer()
-                Button("开启权限…") { permission.request() }
-              }
-            }
+            AccessibilityPermissionStatusView(permission: permission)
           }.frame(maxWidth: .infinity, alignment: .leading)
         } label: { Label("统一入口", systemImage: "square.grid.2x2").font(.headline) }
 

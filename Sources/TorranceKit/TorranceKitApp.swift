@@ -26,13 +26,18 @@ struct TorranceKitApp: App {
 final class AppDelegate: NSObject, NSApplicationDelegate {
   func applicationDidFinishLaunching(_ notification: Notification) {
     NSApp.setActivationPolicy(.accessory)
-    AppModel.shared.start()
-    guard AppLaunchBehavior.shouldShowPicker() else { return }
-    // Let the menu-bar scene finish launching before making the accessory panel key.
-    // Showing it in the same run-loop turn can make macOS immediately resign and hide it.
-    DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
-      AppModel.shared.showLauncher()
+    // Install global event monitors only after AppKit has completed launch.
+    DispatchQueue.main.async {
+      AppModel.shared.start()
+      guard AppLaunchBehavior.shouldShowPicker() else { return }
+      DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+        AppModel.shared.showLauncher()
+      }
     }
+  }
+
+  func applicationDidBecomeActive(_ notification: Notification) {
+    AppModel.shared.applicationDidBecomeActive()
   }
 
   func applicationShouldHandleReopen(

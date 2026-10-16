@@ -5,6 +5,7 @@ import SwiftUI
 final class SettingsWindowController: NSWindowController {
   private unowned let appModel: AppModel
   private let settingsViewModel: SettingsViewModel
+  private var preservesDraftAfterAuthorization = false
 
   init(appModel: AppModel) {
     self.appModel = appModel
@@ -45,11 +46,17 @@ final class SettingsWindowController: NSWindowController {
   }
 
   func show() {
-    if window?.isVisible != true {
+    if window?.isVisible != true && !preservesDraftAfterAuthorization {
       settingsViewModel.load(appModel.configuration.settings)
     }
+    preservesDraftAfterAuthorization = false
     NSApp.activate(ignoringOtherApps: true)
     showWindow(nil)
     window?.makeKeyAndOrderFront(nil)
+  }
+
+  func hideForAccessibilityRequest() {
+    if window?.isVisible == true { preservesDraftAfterAuthorization = true }
+    window?.orderOut(nil)
   }
 }

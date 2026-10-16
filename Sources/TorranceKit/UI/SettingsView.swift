@@ -245,6 +245,7 @@ struct SettingsView: View {
       .padding(16)
     }
     .frame(minWidth: 660, idealWidth: 720, minHeight: 600, idealHeight: 680)
+    .onAppear { permission.refresh() }
   }
 
   private func statusIcon(_ kind: SettingsViewModel.Status.Kind) -> String {
@@ -343,17 +344,7 @@ private struct ClipboardSettingsView: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
-              if !permission.isTrusted {
-                HStack {
-                  Label("双击修饰键需要辅助功能权限。", systemImage: "lock.trianglebadge.exclamationmark")
-                    .font(.caption)
-                    .foregroundStyle(.orange)
-                  Spacer()
-                  Button("开启权限…") {
-                    permission.request()
-                  }
-                }
-              }
+              AccessibilityPermissionStatusView(permission: permission)
             }
           }
           .frame(maxWidth: .infinity, alignment: .leading)

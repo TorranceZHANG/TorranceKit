@@ -4,7 +4,7 @@ TorranceKit 是一款面向 Apple Silicon Mac 的开源原生效率工具集合�
 
 项目使用 SwiftUI / AppKit，无第三方运行时依赖。搜索和计算在本机执行，无遥测；只有用户执行网页搜索或打开网址时交给默认浏览器。安装和更新脚本在用户主动执行时访问 GitHub。
 
-当前版本为 0.3.0，可通过下面的一键安装或更新命令获取；旧用户升级后保留原有剪贴板快捷键。
+当前版本为 0.3.1，可通过下面的一键安装或更新命令获取；旧用户升级后保留原有剪贴板快捷键。
 
 ## 搜索与计算
 
@@ -115,7 +115,9 @@ open dist/TorranceKit.app
 
 首次选择内容时，如果尚未授权，TorranceKit 只会把内容放回系统剪贴板。点击浮层底部或菜单栏里的“开启自动粘贴权限”，在“系统设置 → 隐私与安全性 → 辅助功能”中启用 TorranceKit，即可自动完成 `⌘V`。
 
-如果重新构建后 macOS 未沿用辅助功能权限，先在系统设置中删除旧的 TorranceKit 条目，再重新添加 `dist/TorranceKit.app`。当前本地构建和 GitHub Release 都使用 ad-hoc 签名；以后加入 Apple Developer Program 后，可以改用稳定的 Developer ID 签名：
+设置页会在打开时、从系统设置返回时和后台定时检查当前进程的权限，授权后显示“辅助功能已授权”，并重建双击监听，无需重新保存快捷键。点击“开启权限”会先隐藏启动器、剪贴板和设置窗口，再打开系统授权页面，避免遮挡。
+
+当前本地构建和 GitHub Release 都使用 ad-hoc 签名，更新或重新构建后，系统设置中的旧开关可能仍开启，但不再匹配新应用。此时先关闭再打开 TorranceKit 开关；若仍未生效，删除旧条目，通过应用设置中的“在 Finder 中显示当前应用”定位并重新添加实际运行的副本（默认是 `~/Applications/TorranceKit.app`）。以后加入 Apple Developer Program 后，可以改用稳定的 Developer ID 签名：
 
 ```bash
 CODE_SIGN_IDENTITY="Developer ID Application: Your Name (TEAMID)" ./scripts/build_app.sh

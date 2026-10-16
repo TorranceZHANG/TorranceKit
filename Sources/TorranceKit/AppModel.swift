@@ -61,8 +61,8 @@ final class AppModel: ObservableObject {
     self.history = history
     self.permission = permission
     monitor = ClipboardMonitor(history: history)
-    hotKey = GlobalHotKey(identifier: 1, configuration: settings.hotKey)
-    launcherHotKey = GlobalHotKey(identifier: 2, configuration: settings.launcher.hotKey)
+    hotKey = GlobalHotKey(identifier: 1)
+    launcherHotKey = GlobalHotKey(identifier: 2)
 
     if UserDefaults.standard.object(forKey: Self.captureEnabledKey) == nil {
       isCaptureEnabled = true
@@ -76,16 +76,7 @@ final class AppModel: ObservableObject {
       self?.togglePicker()
     }
     launcherHotKey.onPressed = { [weak self] in self?.toggleLauncher() }
-    if !hotKey.isRegistered || !launcherHotKey.isRegistered {
-      shortcutError = "部分快捷键注册失败，请在设置中调整呼出方式。"
-    }
-    permissionSubscription = permission.$isTrusted.removeDuplicates().dropFirst().sink { [weak self] _ in
-      MainActor.assumeIsolated {
-        guard let self else { return }
-        do { try self.replaceHotKeys(with: self.configuration.settings) }
-        catch { self.shortcutError = error.localizedDescription }
-      }
-    }
+    permission.onWillRequest = { [weak self] in self?.prepareForAccessibilityRequest() }
   }
 
   private static func migrateLegacyPreferencesIfNeeded() {
@@ -104,16 +95,57 @@ final class AppModel: ObservableObject {
     hasStarted = true
     // Capture the current external application before the launch picker activates TorranceKit.
     _ = panelController
+    permission.startMonitoring()
+    do { try replaceHotKeys(with: configuration.settings) }
+    catch { shortcutError = error.localizedDescription }
+    permissionSubscription = permission.$isTrusted.removeDuplicates().dropFirst().sink { [weak self] _ in
+      MainActor.assumeIsolated {
+        guard let self, self.hasStarted else { return }
+        self.refreshDoubleTapMonitors()
+      }
+    }
     monitor.start()
   }
 
   func stop() {
+    hasStarted = false
+    permissionSubscription = nil
+    permission.stopMonitoring()
     monitor.stop()
     hotKey.unregisterTrigger()
     launcherHotKey.unregisterTrigger()
     panelController.hide()
     launcherController.hide()
     PasteController.cancelPendingPaste()
+  }
+
+  func applicationDidBecomeActive() {
+    guard hasStarted else { return }
+    permission.refresh()
+    // Recreate event monitors even if trust was already true at startup. A monitor
+    // created before AppKit/TCC is ready can exist without delivering global keys.
+    refreshDoubleTapMonitors()
+  }
+
+  private func refreshDoubleTapMonitors() {
+    var errors: [String] = []
+    for trigger in [hotKey, launcherHotKey] {
+      do { try trigger.refreshDoubleTapMonitor() }
+      catch { errors.append(error.localizedDescription) }
+    }
+    if !errors.isEmpty {
+      shortcutError = errors.joined(separator: "；")
+    } else if hotKey.isRegistered && launcherHotKey.isRegistered {
+      shortcutError = nil
+    }
+  }
+
+  private func prepareForAccessibilityRequest() {
+    PasteController.cancelPendingPaste()
+    cancelDoubleTapSequences()
+    panelController.hide()
+    launcherController.hide()
+    settingsWindowController.hideForAccessibilityRequest()
   }
 
   func showPicker() {
@@ -149,6 +181,7 @@ final class AppModel: ObservableObject {
   }
 
   func showSettings() {
+    permission.refresh()
     PasteController.cancelPendingPaste()
     panelController.hide()
     launcherController.hide()
